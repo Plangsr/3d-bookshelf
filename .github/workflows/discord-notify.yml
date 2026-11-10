@@ -26,11 +26,13 @@ jobs:
         run: npm run build
 
       - name: Notify Discord on Success
-        if: success()
+        if: success() && env.DISCORD_WEBHOOK != ''
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           curl -H "Content-Type: application/json" -X POST -d '{
             "embeds": [{
-              "title": "✅ GitHub Build & Status: SUCCESS",
+              "title": "✅ 3D Bookshelf Build: SUCCESS",
               "description": "**Repository:** 3d-bookshelf\n**Branch:** `main`\n**Commit:** '"${{ github.event.head_commit.message }}"'\n**Author:** '"${{ github.actor }}"'",
               "color": 5763719,
               "fields": [
@@ -47,17 +49,18 @@ jobs:
               ],
               "footer": {
                 "text": "3D Bookshelf CI/CD Notification"
-              },
-              "timestamp": "'"${{ github.event.head_commit.timestamp }}"'"
+              }
             }]
-          }' ${{ secrets.DISCORD_WEBHOOK }}
+          }' "$DISCORD_WEBHOOK"
 
       - name: Notify Discord on Failure
-        if: failure()
+        if: failure() && env.DISCORD_WEBHOOK != ''
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           curl -H "Content-Type: application/json" -X POST -d '{
             "embeds": [{
-              "title": "❌ GitHub Build & Status: FAILED",
+              "title": "❌ 3D Bookshelf Build: FAILED",
               "description": "**Repository:** 3d-bookshelf\n**Branch:** `main`\n**Commit:** '"${{ github.event.head_commit.message }}"'\n**Author:** '"${{ github.actor }}"'",
               "color": 15548997,
               "fields": [
@@ -71,4 +74,4 @@ jobs:
                 "text": "3D Bookshelf CI/CD Notification"
               }
             }]
-          }' ${{ secrets.DISCORD_WEBHOOK }}
+          }' "$DISCORD_WEBHOOK"
