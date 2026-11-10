@@ -19,7 +19,6 @@ export default function Home() {
         if (data.books && Array.isArray(data.books) && data.books.length > 0) {
           setBooks(data.books);
         } else {
-          // If sheet is empty, check localStorage
           const saved = localStorage.getItem('user_bookshelf_books');
           if (saved) {
             try {
@@ -63,6 +62,23 @@ export default function Home() {
     localStorage.setItem('user_bookshelf_books', JSON.stringify(updated));
   };
 
+  // Delete book from both shelf and Google Sheet
+  const handleDeleteBook = async (bookId: string) => {
+    const updated = books.filter((b) => b.id !== bookId);
+    setBooks(updated);
+    localStorage.setItem('user_bookshelf_books', JSON.stringify(updated));
+
+    try {
+      await fetch('/api/books', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: bookId }),
+      });
+    } catch (e) {
+      console.error('Failed to delete book from backend/sheet:', e);
+    }
+  };
+
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-[#0c0907]">
       {/* 3D Continuous Shelf Scene */}
@@ -70,6 +86,7 @@ export default function Home() {
         books={books}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenReader={(b) => setReadingBook(b)}
+        onDeleteBook={handleDeleteBook}
       />
 
       {/* Mobile Book Scanner Modal */}

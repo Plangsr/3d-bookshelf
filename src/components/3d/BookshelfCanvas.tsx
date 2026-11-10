@@ -13,7 +13,8 @@ import {
   BookOpen, 
   X, 
   ScanLine,
-  Library
+  Library,
+  Trash2
 } from 'lucide-react';
 
 interface ContinuousShelfSceneProps {
@@ -88,12 +89,14 @@ interface BookshelfCanvasProps {
   books: Book[];
   onOpenScanner: () => void;
   onOpenReader: (book: Book) => void;
+  onDeleteBook?: (bookId: string) => void;
 }
 
 export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
   books,
   onOpenScanner,
   onOpenReader,
+  onDeleteBook,
 }) => {
   const [scrollX, setScrollX] = useState<number>(0);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -146,13 +149,11 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
     isDragging.current = false;
   };
 
-  // Mouse Wheel
   const handleWheel = (e: React.WheelEvent) => {
     if (selectedBook) return;
     setScrollX((prev) => Math.max(minScroll, Math.min(maxScroll, prev + e.deltaY * 0.008)));
   };
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (selectedBook) {
@@ -168,6 +169,15 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedBook, maxScroll, minScroll]);
+
+  const handleDeleteCurrentBook = () => {
+    if (!selectedBook) return;
+    if (confirm(`คุณต้องการลบหนังสือ "${selectedBook.title}" ออกจากชั้นและ Google ชีทหรือไม่?`)) {
+      const idToDelete = selectedBook.id;
+      setSelectedBook(null);
+      onDeleteBook?.(idToDelete);
+    }
+  };
 
   return (
     <div
@@ -204,7 +214,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
         </div>
       </header>
 
-      {/* Empty Shelf Prompt (When no books scanned yet) */}
+      {/* Empty Shelf Prompt */}
       {books.length === 0 && !selectedBook && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
           <div className="bg-[#1b1410]/85 backdrop-blur-md p-8 rounded-3xl border border-[#4a3b30]/60 max-w-sm pointer-events-auto shadow-2xl">
@@ -213,7 +223,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
               ชั้นหนังสือยังว่างอยู่
             </h3>
             <p className="text-xs text-[#bcaea0] leading-relaxed mb-6 font-sans">
-              ข้อมูลตัวอย่างทั้งหมดถูกนำออกเรียบร้อยแล้ว เริ่มต้นเพิ่มหนังสือเล่มจริงของคุณโดยการกดปุ่มสแกนด้านล่างได้เลย
+              เริ่มต้นเพิ่มหนังสือของคุณโดยการกดปุ่มสแกนด้านล่าง หรือกรอกข้อมูลลงใน Google ชีทได้เลย
             </p>
             <button
               onClick={onOpenScanner}
@@ -267,7 +277,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
         </div>
       )}
 
-      {/* Inspection Modal Controls */}
+      {/* Inspection Modal Controls with Delete Book Option */}
       {selectedBook && (
         <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 sm:p-8">
           <div className="flex justify-between items-start gap-2">
@@ -279,9 +289,16 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
                 {selectedBook.title}
               </h2>
               <p className="text-xs sm:text-sm text-[#bcaea0] italic mt-0.5">{selectedBook.author}</p>
-              <div className="mt-2.5 pt-2.5 sm:mt-4 sm:pt-4 border-t border-[#3d2f23] text-[10px] sm:text-xs text-[#a99c8f] space-y-0.5 sm:space-y-1">
-                <p>👆 หมุนสัมผัสหน้าจอเพื่อตรวจดูปกและสัน</p>
-                <p>🔍 บีบนิ้ว (Pinch/Zoom) เพื่อดูเนื้อผ้า</p>
+              
+              {/* Delete Book Button inside Inspection Card */}
+              <div className="mt-3 pt-3 border-t border-[#3d2f23] flex items-center justify-between">
+                <button
+                  onClick={handleDeleteCurrentBook}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3d1b1b] hover:bg-[#5a2121] text-red-300 text-xs font-sans font-medium transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>ลบเล่มนี้ออกจากชั้น & ชีท</span>
+                </button>
               </div>
             </div>
 
