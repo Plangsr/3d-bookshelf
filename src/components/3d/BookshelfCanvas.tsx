@@ -12,7 +12,8 @@ import {
   ChevronRight, 
   BookOpen, 
   X, 
-  ScanLine
+  ScanLine,
+  Library
 } from 'lucide-react';
 
 interface ContinuousShelfSceneProps {
@@ -39,6 +40,7 @@ const ShelfScene: React.FC<ContinuousShelfSceneProps> = ({
   onSelectBook,
 }) => {
   const bookPlacements = useMemo(() => {
+    if (books.length === 0) return [];
     let currentX = -((books.length * 0.95) / 2);
     return books.map((book) => {
       const x = currentX + book.depth / 2;
@@ -63,7 +65,7 @@ const ShelfScene: React.FC<ContinuousShelfSceneProps> = ({
       <directionalLight position={[scrollX - 6, 4, 3]} intensity={0.4} color="#ffd4aa" />
 
       {/* The Continuous Walnut Shelf */}
-      <WalnutShelf shelfLength={Math.max(60, books.length * 2)} />
+      <WalnutShelf shelfLength={Math.max(40, books.length * 2)} />
 
       {/* Books standing on shelf */}
       {bookPlacements.map(({ book, position }) => (
@@ -97,7 +99,6 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [hoveredBookId, setHoveredBookId] = useState<string | null>(null);
   
-  // Drag & Touch gestures
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const initialScrollX = useRef(0);
@@ -106,7 +107,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
     return books.find((b) => b.id === hoveredBookId);
   }, [books, hoveredBookId]);
 
-  const maxScroll = (books.length * 0.95) / 2;
+  const maxScroll = Math.max(2, (books.length * 0.95) / 2);
   const minScroll = -maxScroll;
 
   // Mouse Drag Handlers
@@ -180,14 +181,14 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* Mobile-Responsive Header */}
+      {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-6 pointer-events-none bg-gradient-to-b from-black/60 to-transparent">
         <div>
           <h1 className="text-base sm:text-xl tracking-[0.2em] sm:tracking-[0.25em] uppercase text-[#f3ece2] font-semibold font-serif">
             The Complete Shelf
           </h1>
-          <p className="hidden sm:block text-[10px] sm:text-xs text-[#a69888] tracking-widest mt-0.5 uppercase">
-            19-Piece Clothbound Library
+          <p className="text-[10px] sm:text-xs text-[#a69888] tracking-widest mt-0.5 uppercase">
+            {books.length} เล่มบนชั้นวาง
           </p>
         </div>
 
@@ -198,13 +199,34 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
             className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[#f4ece1] hover:bg-[#ffffff] text-[#1c1917] text-[11px] sm:text-xs font-sans font-semibold tracking-wider uppercase shadow-lg transition-transform active:scale-95"
           >
             <ScanLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#8a6839]" />
-            <span className="hidden xs:inline sm:inline">สแกนหนังสือ</span>
-            <span className="sm:hidden">สแกน</span>
+            <span>สแกนหนังสือใหม่</span>
           </button>
         </div>
       </header>
 
-      {/* 3D Canvas with Mobile Performance Limits (DPR capped at 1.5x) */}
+      {/* Empty Shelf Prompt (When no books scanned yet) */}
+      {books.length === 0 && !selectedBook && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
+          <div className="bg-[#1b1410]/85 backdrop-blur-md p-8 rounded-3xl border border-[#4a3b30]/60 max-w-sm pointer-events-auto shadow-2xl">
+            <Library className="w-12 h-12 text-[#e8c170] mx-auto mb-4 opacity-80" />
+            <h3 className="text-lg font-serif font-bold text-[#faf5ee] mb-1.5">
+              ชั้นหนังสือยังว่างอยู่
+            </h3>
+            <p className="text-xs text-[#bcaea0] leading-relaxed mb-6 font-sans">
+              ข้อมูลตัวอย่างทั้งหมดถูกนำออกเรียบร้อยแล้ว เริ่มต้นเพิ่มหนังสือเล่มจริงของคุณโดยการกดปุ่มสแกนด้านล่างได้เลย
+            </p>
+            <button
+              onClick={onOpenScanner}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] font-sans font-bold text-xs uppercase tracking-wider shadow-lg transition-transform active:scale-95"
+            >
+              <ScanLine className="w-4 h-4" />
+              <span>เปิดกล้องสแกนหนังสือเล่มแรก</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Canvas */}
       <Canvas
         dpr={[1, 1.5]}
         gl={{ antialias: false, powerPreference: 'high-performance' }}
@@ -231,7 +253,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
         )}
       </Canvas>
 
-      {/* Toast Book Info on Hover / Tap */}
+      {/* Toast Book Info on Hover */}
       {!selectedBook && hoveredBook && (
         <div className="absolute bottom-24 sm:bottom-28 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center w-11/12 max-w-xs sm:max-w-md transition-all duration-300">
           <div className="bg-[#1b1410]/90 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-xl border border-[#4a3b30]/60 shadow-2xl text-[#f5efe6]">
@@ -245,7 +267,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
         </div>
       )}
 
-      {/* Inspection Modal Controls (Mobile & Desktop Responsive) */}
+      {/* Inspection Modal Controls */}
       {selectedBook && (
         <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 sm:p-8">
           <div className="flex justify-between items-start gap-2">
@@ -285,7 +307,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
       )}
 
       {/* Bottom Shelf Navigation Controls */}
-      {!selectedBook && (
+      {!selectedBook && books.length > 0 && (
         <div className="absolute bottom-5 sm:bottom-8 left-0 right-0 z-20 flex items-center justify-center gap-4 pointer-events-none px-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-[#17110d]/90 backdrop-blur-md px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[#3b2d22] pointer-events-auto shadow-xl">
             <button
