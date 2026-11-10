@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { createWorker } from 'tesseract.js';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Camera, 
-  Upload, 
   Check, 
   X, 
   Loader2, 
-  Sparkles, 
   Type, 
   Palette, 
-  FileText, 
   BookMarked,
-  Layers
+  Layers,
+  Sparkles,
+  Crop,
+  RotateCw,
+  Sun,
+  Contrast
 } from 'lucide-react';
 import { Book, BookPage } from '@/types/book';
 
@@ -51,48 +52,149 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
 
   // OCR Processing Status
   const [isProcessingOcr, setIsProcessingOcr] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatusText, setOcrStatusText] = useState('');
 
-  // Hidden File Inputs
+  // Live Camera & Document Scanner Viewfinder State
+  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [enhanceContrast, setEnhanceContrast] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // File Inputs
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
   const spineInputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  // Stop camera when closing modal or unmounting
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
-  // Handle OCR for a page image using Tesseract.js (supports Thai & English)
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsLiveCameraOpen(false);
+  };
+
+  // Start Live Document Camera with HD resolution & auto-focus
+  const startDocumentCamera = async () => {
+    try {
+      setIsLiveCameraOpen(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' }, // Back camera on mobile
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      });
+
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.warn('Cannot open direct camera stream, fallback to native camera intent:', err);
+      // Fallback to native capture input
+      pageInputRef.current?.click();
+      setIsLiveCameraOpen(false);
+    }
+  };
+
+  // Capture photo from video feed with Document B&W/Contrast Enhancement filter
+  const captureDocumentFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw frame
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Apply Document Scanning Filter (Enhance Text Contrast & Whiten Paper)
+    if (enhanceContrast) {
+      applyDocumentScanFilter(ctx, canvas.width, canvas.height);
+    }
+
+    // Stop camera feed after capture
+    stopCamera();
+
+    // Process with Gemini OCR
+    const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    await processOcrWithGemini(base64Data, 'image/jpeg');
+  };
+
+  // Image Processing Filter for Crisp Document Scanning
+  const applyDocumentScanFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      // Grayscale luminance
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      // High contrast thresholding for crisp printed text
+      const enhanced = gray > 140 ? Math.min(255, gray * 1.25) : Math.max(0, gray * 0.75);
+
+      data[i] = enhanced;
+      data[i + 1] = enhanced;
+      data[i + 2] = enhanced;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  // Process OCR using Google Gemini AI
+  const processOcrWithGemini = async (base64: string, mimeType: string) => {
+    setIsProcessingOcr(true);
+    setOcrStatusText('กำลังใช้ Gemini AI ถอดข้อความภาษาไทย/อังกฤษ...');
+
+    try {
+      const res = await fetch('/api/gemini-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64,
+          mimeType,
+          mode: 'ocr',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.text) {
+        setCurrentPageText(data.text);
+        setOcrStatusText('สแกนเอกสารสำเร็จ!');
+      } else {
+        alert('ไม่สามารถถอดข้อความได้ กรุณาลองถ่ายใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      console.error('OCR Error:', err);
+      alert('เกิดข้อผิดพลาดในการประมวลผล OCR');
+    } finally {
+      setIsProcessingOcr(false);
+    }
+  };
+
+  // Fallback file input handler
   const handlePageImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsProcessingOcr(true);
-    setOcrProgress(0);
-    setOcrStatusText('กำลังเตรียมโมเดลวิเคราะห์ข้อความ (ไทย + อังกฤษ)...');
-
-    try {
-      const worker = await createWorker(['tha', 'eng'], 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-            setOcrStatusText(`กำลังอ่านข้อความในหน้ากระดาษ... ${Math.round(m.progress * 100)}%`);
-          }
-        },
-      });
-
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-
-      // Clean up text and set to editor
-      setCurrentPageText(text);
-      setOcrStatusText('สแกนสำเร็จ!');
-    } catch (err) {
-      console.error('OCR Error:', err);
-      alert('เกิดข้อผิดพลาดในการสแกนข้อความ กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setIsProcessingOcr(false);
-    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      await processOcrWithGemini(base64, file.type);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddPage = () => {
@@ -141,24 +243,104 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     };
 
     onSaveBook(newBook);
+    stopCamera();
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-3xl max-h-[92vh] bg-[#1a1410] border border-[#4a392c] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-[#e8ded2]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-md">
+      <div className="relative w-full max-w-3xl max-h-[94vh] bg-[#1a1410] border border-[#4a392c] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-[#e8ded2]">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#3b2d23] bg-[#140f0c]">
-          <div className="flex items-center gap-2.5">
+        {/* Hidden Canvas for Processing Image Frame */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Live Document Scanner Camera Fullscreen Overlay */}
+        {isLiveCameraOpen && (
+          <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
+            {/* Top Bar inside Camera */}
+            <div className="w-full flex items-center justify-between z-10 text-white">
+              <div className="flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full text-xs">
+                <Crop className="w-4 h-4 text-[#e8c170]" />
+                <span>โหมดสแกนเอกสาร (Document Scan Mode)</span>
+              </div>
+              <button
+                onClick={stopCamera}
+                className="p-2 rounded-full bg-black/60 text-white hover:bg-black/90"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Live Video Feed with Document Scanning Guide Box */}
+            <div className="relative w-full flex-1 flex items-center justify-center overflow-hidden my-3 rounded-2xl border border-white/20">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+
+              {/* Document Alignment Frame Box */}
+              <div className="absolute inset-x-8 inset-y-12 sm:inset-x-16 sm:inset-y-12 border-2 border-[#e8c170] rounded-xl pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-3">
+                <div className="flex justify-between items-start">
+                  <div className="w-6 h-6 border-t-4 border-l-4 border-[#ffd98c] -mt-1 -ml-1 rounded-tl-sm" />
+                  <div className="w-6 h-6 border-t-4 border-r-4 border-[#ffd98c] -mt-1 -mr-1 rounded-tr-sm" />
+                </div>
+                <div className="text-center bg-black/70 py-1 px-3 rounded-full text-[11px] text-[#e8c170] self-center">
+                  จัดหน้ากระดาษให้อยู่ในกรอบนี้
+                </div>
+                <div className="flex justify-between items-end">
+                  <div className="w-6 h-6 border-b-4 border-l-4 border-[#ffd98c] -mb-1 -ml-1 rounded-bl-sm" />
+                  <div className="w-6 h-6 border-b-4 border-r-4 border-[#ffd98c] -mb-1 -mr-1 rounded-br-sm" />
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Shutter Controls */}
+            <div className="w-full flex items-center justify-around z-10 pb-2">
+              <button
+                onClick={() => setEnhanceContrast(!enhanceContrast)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                  enhanceContrast ? 'bg-[#e8c170] text-[#1c1917] font-bold' : 'bg-white/20 text-white'
+                }`}
+              >
+                <Contrast className="w-3.5 h-3.5" />
+                <span>โหมดขาวดำชัดเจน</span>
+              </button>
+
+              {/* Shutter Button */}
+              <button
+                onClick={captureDocumentFrame}
+                className="w-16 h-16 rounded-full border-4 border-white bg-[#e8c170] flex items-center justify-center shadow-2xl active:scale-95 transition-transform"
+                title="กดถ่ายสแกนเอกสาร"
+              >
+                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-[#1c1917]" />
+                </div>
+              </button>
+
+              <div className="w-20" />
+            </div>
+          </div>
+        )}
+
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-[#3b2d23] bg-[#140f0c]">
+          <div className="flex items-center gap-2">
             <BookMarked className="w-5 h-5 text-[#e8c170]" />
-            <h3 className="font-serif font-bold text-lg text-[#f4eee6]">
-              สตูดิโอสแกน & สร้างหนังสือ (Book Scanner Studio)
+            <h3 className="font-serif font-bold text-base sm:text-lg text-[#f4eee6]">
+              สตูดิโอสแกน & สร้างหนังสือ
             </h3>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-[#2e231c] text-[#a99c8f] hover:text-white transition-colors"
+            onClick={() => {
+              stopCamera();
+              onClose();
+            }}
+            className="p-1.5 rounded-full hover:bg-[#2e231c] text-[#a99c8f] hover:text-white"
           >
             <X className="w-5 h-5" />
           </button>
@@ -168,30 +350,30 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
         <div className="flex border-b border-[#3b2d23] bg-[#18120e]">
           <button
             onClick={() => setActiveTab('info')}
-            className={`flex-1 py-3 text-xs tracking-wider uppercase font-sans font-medium transition-colors ${
+            className={`flex-1 py-3 text-[11px] sm:text-xs tracking-wider uppercase font-sans font-medium transition-colors ${
               activeTab === 'info'
                 ? 'border-b-2 border-[#e8c170] text-[#e8c170] bg-[#221a14]'
                 : 'text-[#8c7e70] hover:text-[#cfc2b4]'
             }`}
           >
-            1. ข้อมูลหนังสือ & ภาพปก (Cover & Binding)
+            1. ข้อมูลเล่ม & ปก
           </button>
           <button
             onClick={() => setActiveTab('pages')}
-            className={`flex-1 py-3 text-xs tracking-wider uppercase font-sans font-medium transition-colors ${
+            className={`flex-1 py-3 text-[11px] sm:text-xs tracking-wider uppercase font-sans font-medium transition-colors ${
               activeTab === 'pages'
                 ? 'border-b-2 border-[#e8c170] text-[#e8c170] bg-[#221a14]'
                 : 'text-[#8c7e70] hover:text-[#cfc2b4]'
             }`}
           >
-            2. สแกนเนื้อหาทีละหน้า & OCR (Page Scanner) ({pages.length} หน้า)
+            2. โหมดสแกนเอกสาร & OCR ({pages.length} หน้า)
           </button>
         </div>
 
-        {/* Tab 1: Book Info & 3-Side Cover Scanning */}
+        {/* Tab 1: Book Info */}
         {activeTab === 'info' && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#a8998a] mb-1.5">
                   ชื่อเรื่องหนังสือ (Title) *
@@ -200,7 +382,7 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="เช่น ประวัติศาสตร์ศิลปะร่วมสมัย..."
+                  placeholder="เช่น บันทึกแห่งกาลเวลา..."
                   className="w-full px-4 py-2.5 bg-[#0f0b09] border border-[#3d2e23] rounded-lg text-sm text-[#f5efe6] focus:outline-none focus:border-[#e8c170]"
                 />
               </div>
@@ -219,76 +401,48 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
               </div>
             </div>
 
-            {/* Clothbound Color & Foil Selection */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#a8998a] mb-2">
-                  สีผ้าหุ้มปก (Clothbound Fabric Palette)
-                </label>
-                <div className="flex items-center gap-2.5">
-                  {[
-                    { name: 'Navy', hex: '#1e293b' },
-                    { name: 'Burgundy', hex: '#4c171e' },
-                    { name: 'Forest', hex: '#1b3b2b' },
-                    { name: 'Walnut', hex: '#382e25' },
-                    { name: 'Ochre', hex: '#5c3a21' },
-                    { name: 'Charcoal', hex: '#222225' },
-                  ].map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => setCoverColor(c.hex)}
-                      className={`w-9 h-9 rounded-full border-2 transition-transform ${
-                        coverColor === c.hex ? 'border-[#e8c170] scale-110 shadow-lg' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#a8998a] mb-2">
-                  ลวดลายฟอยล์สะท้อนแสง (Foil Motif)
-                </label>
-                <div className="flex items-center gap-2">
-                  {[
-                    { id: 'gold', label: 'ฟอยล์ทอง (Gold)' },
-                    { id: 'silver', label: 'ฟอยล์เงิน (Silver)' },
-                    { id: 'copper', label: 'คอปเปอร์ (Copper)' },
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setFoilColor(f.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-sans transition-colors ${
-                        foilColor === f.id
-                          ? 'bg-[#e8c170] text-[#1c1917] font-semibold'
-                          : 'bg-[#291f18] text-[#cfc2b4] hover:bg-[#382b22]'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+            {/* Clothbound Color Palette */}
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#a8998a] mb-2">
+                สีผ้าหุ้มปก (Clothbound Fabric)
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                {[
+                  { name: 'Navy', hex: '#1e293b' },
+                  { name: 'Burgundy', hex: '#4c171e' },
+                  { name: 'Forest', hex: '#1b3b2b' },
+                  { name: 'Walnut', hex: '#382e25' },
+                  { name: 'Ochre', hex: '#5c3a21' },
+                  { name: 'Charcoal', hex: '#222225' },
+                ].map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setCoverColor(c.hex)}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform ${
+                      coverColor === c.hex ? 'border-[#e8c170] scale-110 shadow-lg' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.name}
+                  />
+                ))}
               </div>
             </div>
 
-            {/* 3-Side Cover Scanning (Spine, Front, Back) */}
-            <div className="pt-4 border-t border-[#3b2d23]">
+            {/* 3-Side Cover Scanning */}
+            <div className="pt-3 border-t border-[#3b2d23]">
               <span className="text-xs uppercase tracking-wider text-[#a8998a] block mb-3">
-                สแกนภาพจริง 3 ด้าน: ปกหน้า / สันปก / ปกหลัง (สำหรับใส่ในโมเดล 3D และ Drive)
+                ถ่ายภาพจริง 3 ด้าน: ปกหน้า / สันปก / ปกหลัง
               </span>
 
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 {/* Front Cover */}
-                <div className="border border-dashed border-[#4a392c] rounded-xl p-4 flex flex-col items-center justify-center bg-[#130e0b]">
-                  <span className="text-xs font-medium text-[#c8bba9] mb-2">1. ปกหน้า</span>
+                <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
+                  <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">1. ปกหน้า</span>
                   {frontCoverPreview ? (
-                    <img src={frontCoverPreview} alt="Front" className="h-28 object-contain rounded mb-2 shadow" />
+                    <img src={frontCoverPreview} alt="Front" className="h-20 object-contain rounded mb-1.5 shadow" />
                   ) : (
-                    <Camera className="w-8 h-8 text-[#6d5b4d] mb-2" />
+                    <Camera className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}
                   <input
                     type="file"
@@ -303,19 +457,19 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                   />
                   <button
                     onClick={() => frontInputRef.current?.click()}
-                    className="text-xs px-3 py-1.5 rounded bg-[#2c2018] hover:bg-[#3d2e23] text-[#e8c170]"
+                    className="text-[10px] px-2.5 py-1 rounded bg-[#2c2018] text-[#e8c170]"
                   >
-                    ถ่าย / อัปโหลด
+                    ถ่าย/เลือก
                   </button>
                 </div>
 
                 {/* Spine */}
-                <div className="border border-dashed border-[#4a392c] rounded-xl p-4 flex flex-col items-center justify-center bg-[#130e0b]">
-                  <span className="text-xs font-medium text-[#c8bba9] mb-2">2. สันปก</span>
+                <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
+                  <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">2. สันปก</span>
                   {spineCoverPreview ? (
-                    <img src={spineCoverPreview} alt="Spine" className="h-28 object-contain rounded mb-2 shadow" />
+                    <img src={spineCoverPreview} alt="Spine" className="h-20 object-contain rounded mb-1.5 shadow" />
                   ) : (
-                    <Layers className="w-8 h-8 text-[#6d5b4d] mb-2" />
+                    <Layers className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}
                   <input
                     type="file"
@@ -330,19 +484,19 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                   />
                   <button
                     onClick={() => spineInputRef.current?.click()}
-                    className="text-xs px-3 py-1.5 rounded bg-[#2c2018] hover:bg-[#3d2e23] text-[#e8c170]"
+                    className="text-[10px] px-2.5 py-1 rounded bg-[#2c2018] text-[#e8c170]"
                   >
-                    ถ่าย / อัปโหลด
+                    ถ่าย/เลือก
                   </button>
                 </div>
 
                 {/* Back Cover */}
-                <div className="border border-dashed border-[#4a392c] rounded-xl p-4 flex flex-col items-center justify-center bg-[#130e0b]">
-                  <span className="text-xs font-medium text-[#c8bba9] mb-2">3. ปกหลัง</span>
+                <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
+                  <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">3. ปกหลัง</span>
                   {backCoverPreview ? (
-                    <img src={backCoverPreview} alt="Back" className="h-28 object-contain rounded mb-2 shadow" />
+                    <img src={backCoverPreview} alt="Back" className="h-20 object-contain rounded mb-1.5 shadow" />
                   ) : (
-                    <Camera className="w-8 h-8 text-[#6d5b4d] mb-2" />
+                    <Camera className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}
                   <input
                     type="file"
@@ -357,9 +511,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                   />
                   <button
                     onClick={() => backInputRef.current?.click()}
-                    className="text-xs px-3 py-1.5 rounded bg-[#2c2018] hover:bg-[#3d2e23] text-[#e8c170]"
+                    className="text-[10px] px-2.5 py-1 rounded bg-[#2c2018] text-[#e8c170]"
                   >
-                    ถ่าย / อัปโหลด
+                    ถ่าย/เลือก
                   </button>
                 </div>
               </div>
@@ -367,11 +521,12 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Scan Content & OCR & Style formatting */}
+        {/* Tab 2: Document Scanner Viewfinder & Text OCR */}
         {activeTab === 'pages' && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Camera / Upload trigger for OCR */}
-            <div className="bg-[#130f0c] border border-[#3d2f23] rounded-xl p-5 text-center">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            
+            {/* Document Camera Button */}
+            <div className="bg-[#130f0c] border border-[#3d2f23] rounded-2xl p-4 text-center">
               <input
                 type="file"
                 accept="image/*"
@@ -380,59 +535,58 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                 className="hidden"
                 onChange={handlePageImageUpload}
               />
-              <button
-                onClick={() => pageInputRef.current?.click()}
-                disabled={isProcessingOcr}
-                className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-[#e8c170] hover:bg-[#ffd98c] disabled:bg-[#4a3d2e] text-[#1c1917] font-semibold text-sm shadow-lg transition-transform active:scale-95"
-              >
-                {isProcessingOcr ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>{ocrStatusText}</span>
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-5 h-5 text-[#3d2a0e]" />
-                    <span>เปิดกล้องมือถือสแกนหน้ากระดาษ (OCR ภาษาไทย/อังกฤษ)</span>
-                  </>
-                )}
-              </button>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  onClick={startDocumentCamera}
+                  disabled={isProcessingOcr}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-[#e8c170] hover:bg-[#ffd98c] disabled:opacity-50 text-[#1c1917] font-semibold text-xs sm:text-sm shadow-xl transition-transform active:scale-95"
+                >
+                  <Crop className="w-4 h-4 text-[#3d2a0e]" />
+                  <span>เปิดโหมดสแกนเอกสาร (Document Scanner Camera)</span>
+                </button>
+
+                <button
+                  onClick={() => pageInputRef.current?.click()}
+                  disabled={isProcessingOcr}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-[#241a13] hover:bg-[#33241b] text-[#cfc2b4] text-xs font-sans transition-colors"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[#e8c170]" />
+                  <span>อัปโหลดรูปภาพแทน</span>
+                </button>
+              </div>
 
               {isProcessingOcr && (
-                <div className="w-full max-w-md mx-auto mt-4">
-                  <div className="h-2 bg-[#2d221a] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#e8c170] transition-all duration-300"
-                      style={{ width: `${ocrProgress}%` }}
-                    />
-                  </div>
+                <div className="flex items-center justify-center gap-2 mt-3 text-xs text-[#e8c170]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{ocrStatusText}</span>
                 </div>
               )}
             </div>
 
-            {/* Formatting & Style Controls (ฟอนต์, ขนาด, สีข้อความ, สีพื้นหลัง) */}
-            <div className="bg-[#140e0b] p-4 rounded-xl border border-[#3b2d22] flex flex-wrap items-center gap-6">
+            {/* Formatting & Controls */}
+            <div className="bg-[#140e0b] p-3 rounded-xl border border-[#3b2d22] flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <Type className="w-4 h-4 text-[#e8c170]" />
-                <span className="text-xs text-[#a99c8f]">ขนาดฟอนต์:</span>
+                <span className="text-[#a99c8f]">ขนาดฟอนต์:</span>
                 <input
                   type="range"
                   min="14"
-                  max="32"
+                  max="28"
                   value={fontSize}
                   onChange={(e) => setFontSize(Number(e.target.value))}
-                  className="w-24 accent-[#e8c170]"
+                  className="w-20 accent-[#e8c170]"
                 />
-                <span className="text-xs font-mono">{fontSize}px</span>
+                <span className="font-mono">{fontSize}px</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <Palette className="w-4 h-4 text-[#e8c170]" />
-                <span className="text-xs text-[#a99c8f]">สีกระดาษ:</span>
+                <span className="text-[#a99c8f]">สีกระดาษ:</span>
                 {[
                   { name: 'Cream', hex: '#faf7f2' },
-                  { name: 'Warm Parchment', hex: '#f4ebd9' },
-                  { name: 'Vintage Dark', hex: '#1c1917' },
+                  { name: 'Parchment', hex: '#f4ebd9' },
+                  { name: 'Dark', hex: '#1c1917' },
                 ].map((bg) => (
                   <button
                     key={bg.name}
@@ -442,68 +596,54 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                       if (bg.hex === '#1c1917') setTextColor('#e8ded2');
                       else setTextColor('#1c1917');
                     }}
-                    className={`w-5 h-5 rounded-full border ${bgColor === bg.hex ? 'ring-2 ring-[#e8c170]' : ''}`}
+                    className={`w-4 h-4 rounded-full border ${bgColor === bg.hex ? 'ring-2 ring-[#e8c170]' : ''}`}
                     style={{ backgroundColor: bg.hex }}
                     title={bg.name}
                   />
                 ))}
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#a99c8f]">รูปแบบฟอนต์:</span>
-                <select
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value)}
-                  className="bg-[#241a13] border border-[#4a392c] rounded px-2.5 py-1 text-xs text-[#e8ded2]"
-                >
-                  <option value="serif">Serif (Cinzel / หนังสือหรู)</option>
-                  <option value="sans">Sans-serif (โมเดิร์นอ่านง่าย)</option>
-                  <option value="mono">Monospace (เครื่องพิมพ์ดีด)</option>
-                </select>
-              </div>
             </div>
 
-            {/* Text Editor Preview Window */}
+            {/* Text Editor Box */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs uppercase tracking-wider text-[#a8998a]">
-                  เนื้อหาที่สแกนได้ (ตรวจสอบและแก้ไขข้อความได้โดยตรง):
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] uppercase tracking-wider text-[#a8998a]">
+                  ข้อความที่สแกนได้ (สามารถพิมพ์ตรวจทานแก้ไขได้โดยตรง):
                 </label>
                 <button
                   onClick={handleAddPage}
                   disabled={!currentPageText.trim()}
-                  className="px-4 py-1.5 rounded-lg bg-[#e8c170] hover:bg-[#ffd98c] disabled:opacity-40 text-[#1c1917] text-xs font-semibold"
+                  className="px-3 py-1 rounded-lg bg-[#e8c170] hover:bg-[#ffd98c] disabled:opacity-40 text-[#1c1917] text-xs font-semibold"
                 >
-                  + บันทึกหน้านี้ลงในเล่ม (หน้าที่ {pages.length + 1})
+                  + บันทึกเป็นหน้าที่ {pages.length + 1}
                 </button>
               </div>
 
               <textarea
                 value={currentPageText}
                 onChange={(e) => setCurrentPageText(e.target.value)}
-                placeholder="ข้อความที่สแกนจะปรากฏที่นี่ หรือพิมพ์ลงไปได้เองโดยตรง..."
-                rows={9}
+                placeholder="เมื่อกดถ่ายสแกนเอกสาร ข้อความจะปรากฏที่นี่โดยอัตโนมัติ..."
+                rows={7}
                 style={{
                   fontSize: `${fontSize}px`,
                   backgroundColor: bgColor,
                   color: textColor,
-                  fontFamily: fontFamily === 'serif' ? 'Cinzel, Georgia, serif' : fontFamily === 'mono' ? 'monospace' : 'sans-serif',
                 }}
-                className="w-full p-4 rounded-xl border border-[#4a392c] focus:outline-none shadow-inner leading-relaxed"
+                className="w-full p-3.5 rounded-xl border border-[#4a392c] focus:outline-none shadow-inner leading-relaxed font-serif"
               />
             </div>
 
-            {/* Saved Pages List Preview */}
+            {/* Saved Pages Preview */}
             {pages.length > 0 && (
-              <div className="pt-2">
-                <span className="text-xs text-[#a8998a] uppercase tracking-wider block mb-2">
-                  หน้าที่บันทึกแล้วในเล่มนี้:
+              <div className="pt-1">
+                <span className="text-[11px] text-[#a8998a] uppercase tracking-wider block mb-1.5">
+                  หน้าที่บันทึกในเล่มนี้แล้ว ({pages.length} หน้า):
                 </span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {pages.map((p, i) => (
                     <div
                       key={i}
-                      className="px-3 py-1.5 rounded bg-[#241a14] border border-[#3d2e23] text-xs flex items-center gap-2"
+                      className="px-2.5 py-1 rounded bg-[#241a14] border border-[#3d2e23] text-xs flex items-center gap-1.5"
                     >
                       <span>หน้า {p.pageNumber}</span>
                       <button
@@ -520,21 +660,24 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-[#3b2d23] bg-[#140f0c] flex items-center justify-between">
+        {/* Footer */}
+        <div className="px-4 sm:px-6 py-3 border-t border-[#3b2d23] bg-[#140f0c] flex items-center justify-between">
           <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg border border-[#4a392c] text-xs uppercase tracking-wider text-[#b8ab9d] hover:bg-[#251a14]"
+            onClick={() => {
+              stopCamera();
+              onClose();
+            }}
+            className="px-4 py-2 rounded-lg border border-[#4a392c] text-xs text-[#b8ab9d] hover:bg-[#251a14]"
           >
             ยกเลิก
           </button>
 
           <button
             onClick={handleSaveAll}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] text-xs font-semibold uppercase tracking-wider shadow-lg transition-transform active:scale-95"
+            className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95"
           >
             <Check className="w-4 h-4" />
-            <span>สร้างหนังสือและวางบนชั้น 3D</span>
+            <span>สร้างหนังสือวางบนชั้น 3D</span>
           </button>
         </div>
       </div>
