@@ -1,42 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getGoogleSheetsClient } from '@/lib/googleSheets';
+import { INITIAL_BOOKS } from '@/data/books';
 import { Book } from '@/types/book';
 
 const SHEET_ID = '1i_tTqQkL7kd279Nc04-L_l7atRodk_145kFPMejfh3U';
 
-// 1. GET: Fetch all books and their pages from Google Sheet
+// 1. GET: Fetch all books from Google Sheet, fallback to INITIAL_BOOKS if empty
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const timestamp = searchParams.get('t') || Date.now();
 
-    // Fetch Books tab (gid=0)
     const booksCsvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=0&_t=${timestamp}`;
     const booksRes = await fetch(booksCsvUrl, { cache: 'no-store' });
 
-    if (!booksRes.ok) {
-      return NextResponse.json({ books: [], error: 'Failed to fetch Books CSV' });
-    }
-
-    const booksCsvText = await booksRes.text();
-    const books = parseCsvToBooks(booksCsvText);
-
-    // Try fetching Pages tab (if exists as sheet 'Pages')
-    try {
-      const pagesCsvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Pages&_t=${timestamp}`;
-      const pagesRes = await fetch(pagesCsvUrl, { cache: 'no-store' });
-      if (pagesRes.ok) {
-        const pagesCsvText = await pagesRes.text();
-        attachPagesToBooks(books, pagesCsvText);
+    if (booksRes.ok) {
+      const booksCsvText = await booksRes.text();
+      const books = parseCsvToBooks(booksCsvText);
+      if (books.length > 0) {
+        return NextResponse.json({ books });
       }
-    } catch (e) {
-      // Pages sheet optional
     }
 
-    return NextResponse.json({ books });
+    // Default to the 1 showcase mock book if sheet is empty or unavailable
+    return NextResponse.json({ books: INITIAL_BOOKS });
   } catch (error: any) {
     console.error('Error fetching books from sheets:', error);
-    return NextResponse.json({ books: [], error: error.message });
+    return NextResponse.json({ books: INITIAL_BOOKS, error: error.message });
   }
 }
 
@@ -48,7 +38,6 @@ export async function POST(req: Request) {
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       const sheets = getGoogleSheetsClient();
 
-      // Append Book to 'Books' sheet (or first tab)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
         range: 'A:J',
@@ -71,7 +60,6 @@ export async function POST(req: Request) {
         },
       });
 
-      // If book has scanned pages, append them to 'Pages' sheet
       if (newBook.pages && newBook.pages.length > 0) {
         const pageRows = newBook.pages.map((p) => [
           newBook.id,
@@ -100,7 +88,7 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. DELETE: Cascade delete book from 'Books' tab AND all linked pages from 'Pages' tab
+// 3. DELETE: Cascade delete book from 'Books' tab AND all linked pages
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
@@ -111,7 +99,6 @@ export async function DELETE(req: Request) {
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       const sheets = getGoogleSheetsClient();
 
-      // Step A: Find and delete the book from the main Books tab (Sheet 0)
       const bookData = await sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID,
         range: 'A:A',
@@ -139,7 +126,6 @@ export async function DELETE(req: Request) {
         });
       }
 
-      // Step B: Cascade delete all linked pages from the 'Pages' tab
       try {
         const pagesData = await sheets.spreadsheets.values.get({
           spreadsheetId: SHEET_ID,
@@ -147,7 +133,6 @@ export async function DELETE(req: Request) {
         });
         const pageRows = pagesData.data.values || [];
 
-        // Find all row indices matching this book_id (delete in reverse order to keep indices valid)
         const matchingIndices: number[] = [];
         pageRows.forEach((row, idx) => {
           if (row[0] === id) {
@@ -156,13 +141,11 @@ export async function DELETE(req: Request) {
         });
 
         if (matchingIndices.length > 0) {
-          // Get Pages sheetId metadata
           const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
           const pagesSheet = sheetMeta.data.sheets?.find((s) => s.properties?.title === 'Pages');
           const pagesSheetId = pagesSheet?.properties?.sheetId;
 
           if (pagesSheetId !== undefined) {
-            // Reverse delete to prevent shifting
             const deleteRequests = matchingIndices.reverse().map((rIdx) => ({
               deleteDimension: {
                 range: {
@@ -181,7 +164,7 @@ export async function DELETE(req: Request) {
           }
         }
       } catch (err) {
-        console.warn('Pages sheet cascade delete skipped or table not created yet:', err);
+        console.warn('Pages sheet cascade delete skipped:', err);
       }
     }
 
@@ -228,35 +211,5 @@ function parseCsvToBooks(csvText: string): Book[] {
       spineText: title,
       pages: [],
     };
-  });
-}
-
-function attachPagesToBooks(books: Book[], pagesCsvText: string) {
-  const lines = pagesCsvText.trim().split('\n');
-  if (lines.length <= 1) return;
-
-  const dataLines = lines.slice(1);
-  dataLines.forEach((line) => {
-    const cells = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((c) => {
-      let val = c.trim();
-      if (val.startsWith('"') && val.endsWith('"')) {
-        val = val.substring(1, val.length - 1);
-      }
-      return val.trim();
-    });
-
-    const bookId = cells[0];
-    const targetBook = books.find((b) => b.id === bookId);
-    if (targetBook) {
-      if (!targetBook.pages) targetBook.pages = [];
-      targetBook.pages.push({
-        pageNumber: parseInt(cells[1], 10) || targetBook.pages.length + 1,
-        text: cells[2] || '',
-        fontSize: parseInt(cells[3], 10) || 18,
-        fontFamily: cells[4] || 'serif',
-        bgColor: cells[5] || '#faf7f2',
-        textColor: cells[6] || '#1c1917',
-      });
-    }
   });
 }
