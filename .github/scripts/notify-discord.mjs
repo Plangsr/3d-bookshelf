@@ -16,50 +16,67 @@ const commitMsg = (process.env.COMMIT_MSG || 'Update').trim();
 const commitUrl = process.env.COMMIT_URL || `https://github.com/${repo}`;
 const commitSha = (process.env.COMMIT_SHA || '0000000').slice(0, 7);
 const liveUrl = 'https://3d-bookshelf-eosin.vercel.app';
+const runUrl = process.env.RUN_URL || `https://github.com/${repo}/actions`;
 
 const avatarUrl =
   process.env.DISCORD_AVATAR_URL ||
   'https://appointment-scedule.vercel.app/eye-avatar.jpg';
 
-// Discord Embed Format - Exact layout matching Image 2, triggering purely on Deploy Status
+const embedColor = isSuccess ? 0x2ecc71 : 0xe74c3c; // สีเขียวเมื่อสำเร็จ, สีแดงเมื่อล้มเหลว
+const statusEmoji = isSuccess ? '🚀' : '💥';
+const statusBadge = isSuccess ? '✅ DEPLOYMENT SUCCESSFUL' : '❌ DEPLOYMENT FAILED';
+
+// Discord Embed Format - Exact layout matching the requested Deployment Status Card
 const payload = {
   username: 'The Eye of Providence',
   avatar_url: avatarUrl,
   embeds: [
     {
-      title: isSuccess
-        ? '✨ พันธนาการถูกปลดปล่อย! อัปเดตหอสมุด 3D เรียบร้อย'
-        : '💀 หายนะแห่งความว่างเปล่า! Deploy ล้มเหลว',
+      title: `${statusEmoji} ${statusBadge}`,
       url: liveUrl,
-      color: isSuccess ? 0xffd700 : 0xff0044, // สีทองตามรูปที่ 2 (หรือแดงถ้าล้มเหลว)
-      description: [
-        isSuccess
-          ? '🔮 **เนตรแห่งโชคชะตาตรวจพบการร่ายเวทย์ใหม่ลงสู่ห้วงมิติชั้นหนังสือ**'
-          : '⚠️ **เนตรแห่งโชคชะตาตรวจพบข้อผิดพลาดในการ Deploy สู่มิติ**',
-        '',
-        '```yaml',
-        commitMsg,
-        '```'
-      ].join('\n'),
+      color: embedColor,
+      description: isSuccess
+        ? [
+            '🌐 **ระบบได้ทำการ Build & Deploy ขึ้น Production สำเร็จและออนไลน์แล้ว!**',
+            '',
+            '```yaml',
+            `Status: 200 OK - Production Live`,
+            `Target: ${liveUrl}`,
+            `Commit: ${commitMsg}`,
+            '```'
+          ].join('\n')
+        : [
+            '⚠️ **การ Deploy ขึ้นระบบขัดข้อง กรุณาตรวจสอบบันทึกข้อผิดพลาด**',
+            '',
+            '```yaml',
+            `Status: Build / Deploy Error`,
+            `Commit: ${commitMsg}`,
+            '```'
+          ].join('\n'),
       fields: [
         {
-          name: '🌌 ข้อมูลมิติ & สายธาร',
-          value: `• **คลัง:** \`${repo}\`\n• **สาขา:** \`${branch}\``,
+          name: '📡 สถานะระบบ (Live Status)',
+          value: isSuccess ? '🟢 **ONLINE & READY**' : '🔴 **FAILED / OFFLINE**',
           inline: true
         },
         {
-          name: '🧙‍♂️ ผู้ร่ายมนตรา',
-          value: `• **ผู้ทำรายการ:** \`${author}\``,
+          name: '🌿 สาขา & มิติ',
+          value: `\`${branch}\` (\`${commitSha}\`)`,
           inline: true
         },
         {
-          name: '🔗 บันทึก & ทางเข้ามิติ',
-          value: `[🌐 เปิดหน้าชั้นหนังสือ 3D](${liveUrl})  •  [📜 ตรวจสอบ Commit \`${commitSha}\`](${commitUrl})`,
+          name: '🧙‍♂️ ผู้ทำรายการ',
+          value: `\`${author}\``,
+          inline: true
+        },
+        {
+          name: '🔗 ลิงก์ตรวจสอบด่วน',
+          value: `[🌐 เปิดหน้าเว็บที่ Deploy แล้ว](${liveUrl})  •  [📜 ดูบันทึก CI/CD Logs](${runUrl})`,
           inline: false
         }
       ],
       footer: {
-        text: 'เนตรลิขิตสวรรค์ คลื่นจักรพรรดิไร้พ่าย • Vercel Watcher'
+        text: 'เนตรลิขิตสวรรค์ คลื่นจักรพรรดิไร้พ่าย • Vercel Deployment Watcher'
       },
       timestamp: new Date().toISOString()
     }
@@ -81,7 +98,7 @@ const req = https.request(
   },
   (res) => {
     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-      console.log('Successfully sent Discord notification:', res.statusCode);
+      console.log('Successfully sent Discord deployment status notification:', res.statusCode);
       process.exit(0);
     } else {
       console.error('Failed to send Discord notification, status:', res.statusCode);
