@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
+// Cache generated textures so we don't recreate them every render frame
+const textureCache = new Map<string, { frontTexture: THREE.CanvasTexture; spineTexture: THREE.CanvasTexture; backTexture: THREE.CanvasTexture }>();
+
 /**
- * Creates dynamic high-res canvas textures for Clothbound Book Covers with Foil Motifs.
+ * Creates lightweight, high-performance canvas textures for Clothbound Book Covers.
+ * Optimized for mobile GPUs with texture caching and 512x768 resolution.
  */
 export function createBookTextures(
   title: string,
@@ -10,132 +14,120 @@ export function createBookTextures(
   baseColorHex: string,
   foilType: string = 'gold'
 ) {
-  // Foil color palette
-  const foilMap: Record<string, { stroke: string; glow: string; shadow: string }> = {
-    gold: { stroke: '#e8c170', glow: '#fff2b3', shadow: '#966d18' },
-    silver: { stroke: '#dce5ea', glow: '#ffffff', shadow: '#7c8891' },
-    copper: { stroke: '#d98b64', glow: '#fed8c3', shadow: '#8c4826' },
-    deboss: { stroke: '#1a1817', glow: '#2e2a27', shadow: '#0d0c0b' },
+  const cacheKey = `${title}_${author}_${spineText}_${baseColorHex}_${foilType}`;
+  if (textureCache.has(cacheKey)) {
+    return textureCache.get(cacheKey)!;
+  }
+
+  const foilMap: Record<string, { stroke: string }> = {
+    gold: { stroke: '#e8c170' },
+    silver: { stroke: '#dce5ea' },
+    copper: { stroke: '#d98b64' },
+    deboss: { stroke: '#1a1817' },
   };
 
   const foil = foilMap[foilType] || foilMap.gold;
 
-  // 1. FRONT COVER
+  // 1. FRONT COVER (Optimized to 512x768 for 60fps on mobile)
   const frontCanvas = document.createElement('canvas');
-  frontCanvas.width = 1024;
-  frontCanvas.height = 1536;
+  frontCanvas.width = 512;
+  frontCanvas.height = 768;
   const fCtx = frontCanvas.getContext('2d')!;
 
-  // Base cloth color
   fCtx.fillStyle = baseColorHex;
-  fCtx.fillRect(0, 0, 1024, 1536);
-
-  // Cloth weave subtle noise overlay
-  addClothTexture(fCtx, 1024, 1536);
+  fCtx.fillRect(0, 0, 512, 768);
 
   // Outer elegant foil border
   fCtx.strokeStyle = foil.stroke;
-  fCtx.lineWidth = 6;
-  fCtx.strokeRect(60, 60, 904, 1416);
+  fCtx.lineWidth = 3;
+  fCtx.strokeRect(30, 30, 452, 708);
 
   // Inner thin border
-  fCtx.lineWidth = 2;
-  fCtx.strokeRect(80, 80, 864, 1376);
+  fCtx.lineWidth = 1;
+  fCtx.strokeRect(40, 40, 432, 688);
 
   // Corner decorative flourishes
-  drawCornerFoil(fCtx, 90, 90, foil.stroke);
-  drawCornerFoil(fCtx, 934, 90, foil.stroke, true, false);
-  drawCornerFoil(fCtx, 90, 1446, foil.stroke, false, true);
-  drawCornerFoil(fCtx, 934, 1446, foil.stroke, true, true);
+  drawCornerFoil(fCtx, 45, 45, foil.stroke);
+  drawCornerFoil(fCtx, 467, 45, foil.stroke, true, false);
+  drawCornerFoil(fCtx, 45, 723, foil.stroke, false, true);
+  drawCornerFoil(fCtx, 467, 723, foil.stroke, true, true);
 
-  // Abstract center foil medallion / motif
-  drawCenterMotif(fCtx, 512, 580, foil.stroke);
+  // Center foil medallion
+  drawCenterMotif(fCtx, 256, 290, foil.stroke);
 
   // Title
   fCtx.fillStyle = foil.stroke;
-  fCtx.font = 'bold 58px "Cinzel", "Playfair Display", "Georgia", serif';
+  fCtx.font = 'bold 30px "Cinzel", "Playfair Display", "Georgia", serif';
   fCtx.textAlign = 'center';
-  wrapText(fCtx, title.toUpperCase(), 512, 860, 720, 70);
+  wrapText(fCtx, title.toUpperCase(), 256, 430, 360, 36);
 
-  // Divider
+  // Divider line
   fCtx.beginPath();
-  fCtx.moveTo(400, 1080);
-  fCtx.lineTo(624, 1080);
-  fCtx.lineWidth = 3;
+  fCtx.moveTo(200, 540);
+  fCtx.lineTo(312, 540);
+  fCtx.lineWidth = 1.5;
   fCtx.stroke();
 
   // Author
-  fCtx.font = 'italic 36px "Cinzel", "Georgia", serif';
-  fCtx.fillText(author, 512, 1150);
+  fCtx.font = 'italic 19px "Cinzel", "Georgia", serif';
+  fCtx.fillText(author, 256, 580);
 
-  // 2. SPINE COVER
+  // 2. SPINE COVER (192x768)
   const spineCanvas = document.createElement('canvas');
-  spineCanvas.width = 384;
-  spineCanvas.height = 1536;
+  spineCanvas.width = 192;
+  spineCanvas.height = 768;
   const sCtx = spineCanvas.getContext('2d')!;
 
   sCtx.fillStyle = baseColorHex;
-  sCtx.fillRect(0, 0, 384, 1536);
-  addClothTexture(sCtx, 384, 1536);
+  sCtx.fillRect(0, 0, 192, 768);
 
-  // Spine gold bands (top & bottom)
+  // Spine bands
   sCtx.strokeStyle = foil.stroke;
-  sCtx.lineWidth = 4;
-  [120, 140, 1396, 1416].forEach((y) => {
+  sCtx.lineWidth = 2;
+  [60, 70, 698, 708].forEach((y) => {
     sCtx.beginPath();
-    sCtx.moveTo(30, y);
-    sCtx.lineTo(354, y);
+    sCtx.moveTo(15, y);
+    sCtx.lineTo(177, y);
     sCtx.stroke();
   });
 
   // Vertical spine title
   sCtx.save();
-  sCtx.translate(192, 768);
+  sCtx.translate(96, 384);
   sCtx.rotate(Math.PI / 2);
   sCtx.fillStyle = foil.stroke;
-  sCtx.font = '600 38px "Cinzel", "Georgia", serif';
+  sCtx.font = '600 20px "Cinzel", "Georgia", serif';
   sCtx.textAlign = 'center';
-  sCtx.fillText((spineText || title).toUpperCase(), 0, 12);
+  sCtx.fillText((spineText || title).toUpperCase(), 0, 7);
   sCtx.restore();
 
   // 3. BACK COVER
   const backCanvas = document.createElement('canvas');
-  backCanvas.width = 1024;
-  backCanvas.height = 1536;
+  backCanvas.width = 512;
+  backCanvas.height = 768;
   const bCtx = backCanvas.getContext('2d')!;
 
   bCtx.fillStyle = baseColorHex;
-  bCtx.fillRect(0, 0, 1024, 1536);
-  addClothTexture(bCtx, 1024, 1536);
-
+  bCtx.fillRect(0, 0, 512, 768);
   bCtx.strokeStyle = foil.stroke;
-  bCtx.lineWidth = 4;
-  bCtx.strokeRect(70, 70, 884, 1396);
-  drawCenterMotif(bCtx, 512, 768, foil.stroke, 0.7);
+  bCtx.lineWidth = 2;
+  bCtx.strokeRect(35, 35, 442, 698);
+  drawCenterMotif(bCtx, 256, 384, foil.stroke, 0.6);
 
-  // Convert canvases to Three.js textures
+  // Convert to Three.js textures
   const frontTexture = new THREE.CanvasTexture(frontCanvas);
   const spineTexture = new THREE.CanvasTexture(spineCanvas);
   const backTexture = new THREE.CanvasTexture(backCanvas);
 
   [frontTexture, spineTexture, backTexture].forEach((t) => {
     t.colorSpace = THREE.SRGBColorSpace;
-    t.generateMipmaps = true;
+    t.generateMipmaps = false; // Disable mipmaps for fast rendering
+    t.minFilter = THREE.LinearFilter;
   });
 
-  return { frontTexture, spineTexture, backTexture };
-}
-
-function addClothTexture(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const imgData = ctx.getImageData(0, 0, w, h);
-  const data = imgData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 14;
-    data[i] = Math.min(255, Math.max(0, data[i] + noise));
-    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
-  }
-  ctx.putImageData(imgData, 0, 0);
+  const result = { frontTexture, spineTexture, backTexture };
+  textureCache.set(cacheKey, result);
+  return result;
 }
 
 function drawCornerFoil(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, flipX = false, flipY = false) {
@@ -143,14 +135,14 @@ function drawCornerFoil(ctx: CanvasRenderingContext2D, x: number, y: number, col
   ctx.translate(x, y);
   ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(0, 40);
+  ctx.moveTo(0, 20);
   ctx.lineTo(0, 0);
-  ctx.lineTo(40, 0);
+  ctx.lineTo(20, 0);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(15, 15, 8, 0, Math.PI * 2);
+  ctx.arc(8, 8, 4, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
@@ -158,25 +150,24 @@ function drawCornerFoil(ctx: CanvasRenderingContext2D, x: number, y: number, col
 function drawCenterMotif(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string, scale = 1) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * 0.65, scale * 0.65);
   ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2;
 
-  // Diamond with concentric rings & delicate lines
   ctx.beginPath();
-  ctx.moveTo(0, -90);
-  ctx.lineTo(90, 0);
-  ctx.lineTo(0, 90);
-  ctx.lineTo(-90, 0);
+  ctx.moveTo(0, -60);
+  ctx.lineTo(60, 0);
+  ctx.lineTo(0, 60);
+  ctx.lineTo(-60, 0);
   ctx.closePath();
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(0, 0, 45, 0, Math.PI * 2);
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(0, 0, 18, 0, Math.PI * 2);
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
