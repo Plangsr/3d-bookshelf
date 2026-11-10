@@ -14,17 +14,21 @@ const commitUrl = process.env.COMMIT_URL || `https://github.com/${repo}`;
 const commitSha = (process.env.COMMIT_SHA || '0000000').slice(0, 7);
 const liveUrl = 'https://3d-bookshelf-delta.vercel.app';
 
-// Discord Embed Format - Clean, Premium Editorial Typography
+const avatarUrl =
+  process.env.DISCORD_AVATAR_URL ||
+  'https://appointment-scedule.vercel.app/eye-avatar.jpg';
+
+// Discord Embed Format - Exact Signature from Appointment Schedule project
 const payload = {
-  username: 'The Complete Shelf Keeper',
-  avatar_url: 'https://images.unsplash.com/photo-1507842229450-79050d402b8b?auto=format&fit=crop&w=256&q=80',
+  username: 'The Eye of Providence',
+  avatar_url: avatarUrl,
   embeds: [
     {
-      title: '📚 อัปเดตหอสมุด The Complete Shelf สำเร็จแล้ว!',
+      title: '✨ พันธนาการถูกปลดปล่อย! อัปเดตหอสมุด 3D เรียบร้อย',
       url: liveUrl,
-      color: 0xe8c170, // Warm Gold Accent
+      color: 0xffd700, // Gold Accent
       description: [
-        '✨ **ชั้นหนังสือ 3D และระบบสแกนเนอร์ได้รับการอัปเดตขึ้นสู่ Production เรียบร้อย**',
+        '🔮 **เนตรแห่งโชคชะตาตรวจพบการร่ายเวทย์ใหม่ลงสู่ห้วงมิติชั้นหนังสือ**',
         '',
         '```yaml',
         commitMsg,
@@ -32,23 +36,23 @@ const payload = {
       ].join('\n'),
       fields: [
         {
-          name: '📖 ข้อมูลคลัง & สาขา',
+          name: '🌌 ข้อมูลมิติ & สายธาร',
           value: `• **คลัง:** \`${repo}\`\n• **สาขา:** \`${branch}\``,
           inline: true
         },
         {
-          name: '✍️ ผู้ประพันธ์การเปลี่ยนแปลง',
+          name: '🧙‍♂️ ผู้ร่ายมนตรา',
           value: `• **ผู้ทำรายการ:** \`${author}\``,
           inline: true
         },
         {
-          name: '🔗 ทางเข้าชมชั้นหนังสือ & ประวัติ',
+          name: '🔗 บันทึก & ทางเข้ามิติ',
           value: `[🌐 เปิดหน้าชั้นหนังสือ 3D](${liveUrl})  •  [📜 ตรวจสอบ Commit \`${commitSha}\`](${commitUrl})`,
           inline: false
         }
       ],
       footer: {
-        text: 'The Complete Shelf • 3D Editorial Library & Scanner'
+        text: 'เนตรลิขิตสวรรค์ คลื่นจักรพรรดิไร้พ่าย • Vercel Watcher'
       },
       timestamp: new Date().toISOString()
     }
