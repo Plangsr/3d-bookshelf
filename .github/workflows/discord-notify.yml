@@ -1,4 +1,4 @@
-name: Vercel Deploy & Discord Notify
+name: Vercel Deploy & Discord Status
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  notify-deploy:
+  build-and-verify-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -16,14 +16,45 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
-      - name: Send Discord Notification
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js Production App
+        run: npm run build
+
+      - name: Verify Live Deployment Endpoint
+        run: |
+          echo "Verifying production deployment endpoint..."
+          sleep 10
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://3d-bookshelf-eosin.vercel.app || echo "000")
+          echo "Live endpoint HTTP status: $STATUS_CODE"
+
+      - name: Send Discord Notification - Deployment SUCCESS
+        if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DEPLOY_STATUS: "SUCCESS"
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
           BRANCH: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
           COMMIT_URL: ${{ github.event.head_commit.url }}
           COMMIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/notify-discord.mjs
+
+      - name: Send Discord Notification - Deployment FAILED
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DEPLOY_STATUS: "FAILED"
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node .github/scripts/notify-discord.mjs
