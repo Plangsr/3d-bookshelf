@@ -14,7 +14,8 @@ import {
   X, 
   ScanLine,
   Library,
-  Trash2
+  Trash2,
+  Search
 } from 'lucide-react';
 
 interface ContinuousShelfSceneProps {
@@ -28,6 +29,7 @@ interface ContinuousShelfSceneProps {
 const ShelfCameraRig: React.FC<{ scrollX: number }> = ({ scrollX }) => {
   const { camera } = useThree();
   useFrame(() => {
+    // Smooth lerp to center book/shelf position
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, scrollX, 0.1);
   });
   return null;
@@ -56,25 +58,26 @@ const ShelfScene: React.FC<ContinuousShelfSceneProps> = ({
     <>
       <ShelfCameraRig scrollX={scrollX} />
       
-      {/* Optimized lighting */}
-      <ambientLight intensity={0.7} />
+      {/* Front-Facing Atmospheric Lighting */}
+      <ambientLight intensity={0.8} />
       <directionalLight
-        position={[scrollX + 5, 8, 8]}
-        intensity={1.5}
-        color="#fffaf0"
+        position={[scrollX, 4, 9]}
+        intensity={1.8}
+        color="#fffbf2"
       />
-      <directionalLight position={[scrollX - 6, 4, 3]} intensity={0.4} color="#ffd4aa" />
+      <directionalLight position={[scrollX - 5, 2, 6]} intensity={0.5} color="#ffd4aa" />
+      <directionalLight position={[scrollX + 5, 2, 6]} intensity={0.5} color="#e5ecf5" />
 
-      {/* The Continuous Walnut Shelf */}
-      <WalnutShelf shelfLength={Math.max(40, books.length * 2)} />
+      {/* The Classic Front-Facing Walnut Cabinet */}
+      <WalnutShelf shelfLength={Math.max(35, books.length * 2.2)} />
 
-      {/* Books standing on shelf */}
+      {/* Books standing on shelf facing directly forward */}
       {bookPlacements.map(({ book, position }) => (
         <BookModel
           key={book.id}
           book={book}
           position={position}
-          rotation={[0, Math.PI / 2, 0]}
+          rotation={[0, Math.PI / 2, 0]} // Spine facing directly front to viewer
           isHovered={hoveredBookId === book.id}
           onClick={() => onSelectBook(book)}
           onPointerOver={() => onHoverBook(book.id)}
@@ -101,16 +104,30 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
   const [scrollX, setScrollX] = useState<number>(0);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [hoveredBookId, setHoveredBookId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const initialScrollX = useRef(0);
 
-  const hoveredBook = useMemo(() => {
-    return books.find((b) => b.id === hoveredBookId);
-  }, [books, hoveredBookId]);
+  // Filter books according to search query
+  const filteredBooks = useMemo(() => {
+    if (!searchQuery.trim()) return books;
+    const q = searchQuery.toLowerCase();
+    return books.filter(
+      (b) =>
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        (b.year && b.year.includes(q))
+    );
+  }, [books, searchQuery]);
 
-  const maxScroll = Math.max(2, (books.length * 0.95) / 2);
+  const hoveredBook = useMemo(() => {
+    return filteredBooks.find((b) => b.id === hoveredBookId);
+  }, [filteredBooks, hoveredBookId]);
+
+  const maxScroll = Math.max(2, (filteredBooks.length * 0.95) / 2);
   const minScroll = -maxScroll;
 
   // Mouse Drag Handlers
@@ -191,58 +208,114 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-6 pointer-events-none bg-gradient-to-b from-black/60 to-transparent">
+      {/* Header with Search Bar */}
+      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 pointer-events-none bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <div>
           <h1 className="text-base sm:text-xl tracking-[0.2em] sm:tracking-[0.25em] uppercase text-[#f3ece2] font-semibold font-serif">
             The Complete Shelf
           </h1>
           <p className="text-[10px] sm:text-xs text-[#a69888] tracking-widest mt-0.5 uppercase">
-            {books.length} เล่มบนชั้นวาง
+            {filteredBooks.length} เล่มบนตู้ไม้
           </p>
         </div>
 
-        {/* Action Button */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        {/* Action Controls: Search & Scan */}
+        <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+          {/* Search Toggle & Input */}
+          <div className="relative flex items-center">
+            {isSearchOpen ? (
+              <div className="flex items-center bg-[#1c1410]/95 border border-[#4a3728] rounded-full px-3 py-1.5 shadow-2xl transition-all w-48 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-[#e8c170] mr-2 shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="ค้นหาชื่อหนังสือ / ผู้แต่ง..."
+                  autoFocus
+                  className="bg-transparent border-none text-xs text-[#f5efe6] focus:outline-none w-full font-sans"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="p-0.5 text-[#a8998a] hover:text-white mr-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className="p-0.5 text-[#a8998a] hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="p-2 sm:p-2.5 rounded-full bg-[#1c1410]/90 hover:bg-[#2e2118] text-[#f4ece1] border border-[#4a3728] shadow-lg transition-transform active:scale-95"
+                title="ค้นหาหนังสือ"
+              >
+                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#e8c170]" />
+              </button>
+            )}
+          </div>
+
+          {/* Add / Scan Book */}
           <button
             onClick={onOpenScanner}
             className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[#f4ece1] hover:bg-[#ffffff] text-[#1c1917] text-[11px] sm:text-xs font-sans font-semibold tracking-wider uppercase shadow-lg transition-transform active:scale-95"
           >
             <ScanLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#8a6839]" />
-            <span>สแกนหนังสือใหม่</span>
+            <span className="hidden xs:inline">สแกนหนังสือใหม่</span>
+            <span className="xs:hidden">สแกน</span>
           </button>
         </div>
       </header>
 
       {/* Empty Shelf Prompt */}
-      {books.length === 0 && !selectedBook && (
+      {filteredBooks.length === 0 && !selectedBook && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
-          <div className="bg-[#1b1410]/85 backdrop-blur-md p-8 rounded-3xl border border-[#4a3b30]/60 max-w-sm pointer-events-auto shadow-2xl">
+          <div className="bg-[#1b1410]/90 backdrop-blur-md p-8 rounded-3xl border border-[#4a3b30]/60 max-w-sm pointer-events-auto shadow-2xl">
             <Library className="w-12 h-12 text-[#e8c170] mx-auto mb-4 opacity-80" />
             <h3 className="text-lg font-serif font-bold text-[#faf5ee] mb-1.5">
-              ชั้นหนังสือยังว่างอยู่
+              {searchQuery ? 'ไม่พบหนังสือที่ตรงกับคำค้นหา' : 'ตู้หนังสือยังว่างอยู่'}
             </h3>
             <p className="text-xs text-[#bcaea0] leading-relaxed mb-6 font-sans">
-              เริ่มต้นเพิ่มหนังสือของคุณโดยการกดปุ่มสแกนด้านล่าง หรือกรอกข้อมูลลงใน Google ชีทได้เลย
+              {searchQuery 
+                ? `ไม่พบหนังสือที่มีชื่อหรือผู้แต่งตรงกับ "${searchQuery}" ลองค้นหาด้วยคำอื่นหรือกดล้างการค้นหา`
+                : 'เริ่มต้นเพิ่มหนังสือเล่มโปรดของคุณเข้าสู่ตู้ไม้วอลนัต โดยการกดปุ่มสแกนด้านล่างได้เลย'}
             </p>
-            <button
-              onClick={onOpenScanner}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] font-sans font-bold text-xs uppercase tracking-wider shadow-lg transition-transform active:scale-95"
-            >
-              <ScanLine className="w-4 h-4" />
-              <span>เปิดกล้องสแกนหนังสือเล่มแรก</span>
-            </button>
+            {searchQuery ? (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="w-full py-2.5 rounded-xl bg-[#2e2118] text-[#e8c170] font-sans text-xs font-semibold uppercase tracking-wider"
+              >
+                ล้างคำค้นหา
+              </button>
+            ) : (
+              <button
+                onClick={onOpenScanner}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] font-sans font-bold text-xs uppercase tracking-wider shadow-lg transition-transform active:scale-95"
+              >
+                <ScanLine className="w-4 h-4" />
+                <span>เปิดกล้องสแกนหนังสือเล่มแรก</span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas - Front Eye-level Perspective (มุมมองระดับสายตาตรงเข้าตู้ไม้) */}
       <Canvas
         dpr={[1, 1.5]}
         gl={{ antialias: false, powerPreference: 'high-performance' }}
         camera={{
-          position: selectedBook ? [0, 0, 5] : [scrollX, 2.2, 7.5],
-          fov: 38,
+          // Position camera squarely at front eye level [x, y=2.05, z=6.8] pointing straight forward
+          position: selectedBook ? [0, 0, 5] : [scrollX, 2.05, 6.8],
+          fov: 34,
         }}
         className="w-full h-full cursor-grab active:cursor-grabbing"
       >
@@ -254,7 +327,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
           />
         ) : (
           <ShelfScene
-            books={books}
+            books={filteredBooks}
             scrollX={scrollX}
             hoveredBookId={hoveredBookId}
             onHoverBook={setHoveredBookId}
@@ -277,7 +350,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
         </div>
       )}
 
-      {/* Inspection Modal Controls with Delete Book Option */}
+      {/* Inspection Modal Controls */}
       {selectedBook && (
         <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 sm:p-8">
           <div className="flex justify-between items-start gap-2">
@@ -324,7 +397,7 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
       )}
 
       {/* Bottom Shelf Navigation Controls */}
-      {!selectedBook && books.length > 0 && (
+      {!selectedBook && filteredBooks.length > 0 && (
         <div className="absolute bottom-5 sm:bottom-8 left-0 right-0 z-20 flex items-center justify-center gap-4 pointer-events-none px-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-[#17110d]/90 backdrop-blur-md px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[#3b2d22] pointer-events-auto shadow-xl">
             <button
@@ -337,8 +410,8 @@ export const BookshelfCanvas: React.FC<BookshelfCanvasProps> = ({
 
             {/* Indicator dots */}
             <div className="flex items-center gap-1 sm:gap-1.5 px-1 sm:px-2">
-              {books.slice(0, 8).map((b, idx) => {
-                const bookStep = (maxScroll - minScroll) / books.length;
+              {filteredBooks.slice(0, 8).map((b, idx) => {
+                const bookStep = (maxScroll - minScroll) / filteredBooks.length;
                 const bookPos = minScroll + idx * bookStep;
                 const isActive = Math.abs(scrollX - bookPos) < bookStep * 0.8;
                 return (

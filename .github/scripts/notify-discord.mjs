@@ -99,6 +99,7 @@ const req = https.request(
   (res) => {
     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
       console.log('Successfully sent Discord deployment status notification:', res.statusCode);
+
       process.exit(0);
     } else {
       console.error('Failed to send Discord notification, status:', res.statusCode);
