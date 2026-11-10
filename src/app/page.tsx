@@ -11,31 +11,31 @@ export default function Home() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
-  // Load saved books from localStorage or API on initial render
-  useEffect(() => {
-    // 1. Try local storage first for persistent user books without needing DB
-    const saved = localStorage.getItem('user_bookshelf_books');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBooks(parsed);
-          return;
-        }
-      } catch (e) {
-        console.error('Failed to parse local books:', e);
-      }
-    }
-
-    // 2. Fetch from Google Sheets API
+  // Always fetch real books from Google Sheet first
+  const loadBooksFromSheet = () => {
     fetch('/api/books')
       .then((res) => res.json())
       .then((data) => {
-        if (data.books && Array.isArray(data.books)) {
+        if (data.books && Array.isArray(data.books) && data.books.length > 0) {
           setBooks(data.books);
+        } else {
+          // If sheet is empty, check localStorage
+          const saved = localStorage.getItem('user_bookshelf_books');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setBooks(parsed);
+              }
+            } catch (e) {}
+          }
         }
       })
-      .catch((err) => console.log('Clean library ready:', err));
+      .catch((err) => console.error('Sheet fetch error:', err));
+  };
+
+  useEffect(() => {
+    loadBooksFromSheet();
   }, []);
 
   // Save new book
@@ -55,7 +55,7 @@ export default function Home() {
     }
   };
 
-  // Update existing book (Page edits, add/delete pages)
+  // Update existing book
   const handleUpdateBook = (updatedBook: Book) => {
     const updated = books.map((b) => (b.id === updatedBook.id ? updatedBook : b));
     setBooks(updated);

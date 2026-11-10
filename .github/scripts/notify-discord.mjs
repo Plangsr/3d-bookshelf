@@ -16,67 +16,50 @@ const commitMsg = (process.env.COMMIT_MSG || 'Update').trim();
 const commitUrl = process.env.COMMIT_URL || `https://github.com/${repo}`;
 const commitSha = (process.env.COMMIT_SHA || '0000000').slice(0, 7);
 const liveUrl = 'https://3d-bookshelf-eosin.vercel.app';
-const runUrl = process.env.RUN_URL || `https://github.com/${repo}/actions`;
 
 const avatarUrl =
   process.env.DISCORD_AVATAR_URL ||
   'https://appointment-scedule.vercel.app/eye-avatar.jpg';
 
-const embedColor = isSuccess ? 0x2ecc71 : 0xe74c3c; // Green on Success, Red on Failure
-const statusEmoji = isSuccess ? '🚀' : '💥';
-const statusBadge = isSuccess ? '✅ DEPLOYMENT SUCCESSFUL' : '❌ DEPLOYMENT FAILED';
-
-// Discord Embed Format - Dedicated to Production Deployment Status
+// Discord Embed Format - Exact Signature from Appointment Schedule project, dedicated to Deploy Status
 const payload = {
   username: 'The Eye of Providence',
   avatar_url: avatarUrl,
   embeds: [
     {
-      title: `${statusEmoji} ${statusBadge}`,
+      title: isSuccess 
+        ? '✨ พันธนาการถูกปลดปล่อย! Vercel Deploy สำเร็จเรียบร้อย'
+        : '💥 พิธีกรรมขัดข้อง! Vercel Deploy ล้มเหลว',
       url: liveUrl,
-      color: embedColor,
-      description: isSuccess
-        ? [
-            '🌐 **ระบบได้ทำการ Build & Deploy ขึ้น Production สำเร็จและออนไลน์แล้ว!**',
-            '',
-            '```yaml',
-            `Status: 200 OK - Production Live`,
-            `Target: ${liveUrl}`,
-            `Commit: ${commitMsg}`,
-            '```'
-          ].join('\n')
-        : [
-            '⚠️ **การ Deploy ขึ้นระบบขัดข้อง กรุณาตรวจสอบบันทึกข้อผิดพลาด**',
-            '',
-            '```yaml',
-            `Status: Build / Deploy Error`,
-            `Commit: ${commitMsg}`,
-            '```'
-          ].join('\n'),
+      color: isSuccess ? 0xffd700 : 0xe74c3c, // Gold Accent like Appointment Schedule
+      description: [
+        isSuccess
+          ? '🔮 **เนตรแห่งโชคชะตาตรวจพบการ Deploy ใหม่ขึ้นสู่ Production เรียบร้อย**'
+          : '⚠️ **เนตรแห่งโชคชะตาตรวจพบข้อผิดพลาดในการ Deploy**',
+        '',
+        '```yaml',
+        commitMsg,
+        '```'
+      ].join('\n'),
       fields: [
         {
-          name: '📡 สถานะระบบ (Live Status)',
-          value: isSuccess ? '🟢 **ONLINE & READY**' : '🔴 **FAILED / OFFLINE**',
+          name: '🌌 ข้อมูลมิติ & สาขา',
+          value: `• **คลัง:** \`${repo}\`\n• **สาขา:** \`${branch}\``,
           inline: true
         },
         {
-          name: '🌿 สาขา & มิติ',
-          value: `\`${branch}\` (\`${commitSha}\`)`,
+          name: '🧙‍♂️ ผู้ร่ายมนตรา',
+          value: `• **ผู้ทำรายการ:** \`${author}\``,
           inline: true
         },
         {
-          name: '🧙‍♂️ ผู้ทำรายการ',
-          value: `\`${author}\``,
-          inline: true
-        },
-        {
-          name: '🔗 ลิงก์ตรวจสอบด่วน',
-          value: `[🌐 เปิดหน้าเว็บที่ Deploy แล้ว](${liveUrl})  •  [📜 ดูบันทึก CI/CD Logs](${runUrl})`,
+          name: '🔗 บันทึก & ทางเข้ามิติ',
+          value: `[🌐 เปิดหน้าเว็บระบบ](${liveUrl})  •  [📜 ตรวจสอบ Commit \`${commitSha}\`](${commitUrl})`,
           inline: false
         }
       ],
       footer: {
-        text: 'เนตรลิขิตสวรรค์ คลื่นจักรพรรดิไร้พ่าย • Vercel Deployment Watcher'
+        text: 'เนตรลิขิตสวรรค์ คลื่นจักรพรรดิไร้พ่าย • Vercel Watcher'
       },
       timestamp: new Date().toISOString()
     }
@@ -98,7 +81,7 @@ const req = https.request(
   },
   (res) => {
     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-      console.log('Successfully sent Discord deployment status notification:', res.statusCode);
+      console.log('Successfully sent Discord notification:', res.statusCode);
       process.exit(0);
     } else {
       console.error('Failed to send Discord notification, status:', res.statusCode);
