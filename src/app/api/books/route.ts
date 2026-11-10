@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { Book } from '@/types/book';
 
-export const dynamic = 'force-dynamic';
-
 const SHEET_ID = '1i_tTqQkL7kd279Nc04-L_l7atRodk_145kFPMejfh3U';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=0`;
+    // Reading request URL makes the route dynamic automatically in Next.js Turbopack
+    const { searchParams } = new URL(request.url);
+    const timestamp = searchParams.get('t') || Date.now();
+
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=0&_t=${timestamp}`;
     const res = await fetch(csvUrl, { cache: 'no-store' });
 
     if (!res.ok) {
