@@ -12,7 +12,7 @@ const author = process.env.COMMIT_AUTHOR || 'Plangsr';
 const commitMsg = (process.env.COMMIT_MSG || 'Update').trim();
 const commitUrl = process.env.COMMIT_URL || `https://github.com/${repo}`;
 const commitSha = (process.env.COMMIT_SHA || '0000000').slice(0, 7);
-const liveUrl = 'https://3d-bookshelf-delta.vercel.app';
+const liveUrl = 'https://3d-bookshelf-eosin.vercel.app';
 
 const avatarUrl =
   process.env.DISCORD_AVATAR_URL ||
