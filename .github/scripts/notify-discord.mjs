@@ -9,31 +9,53 @@ if (!webhookUrl) {
 const status = (process.env.DEPLOY_STATUS || 'SUCCESS').toUpperCase();
 const isSuccess = status === 'SUCCESS';
 
-const projectName = '3d-bookshelf';
-const commitMsg = (process.env.COMMIT_MSG || 'อัปเดตระบบชั้นหนังสือ 3D').trim();
-const liveUrl = 'https://3d-bookshelf-eosin.vercel.app';
+const repo = process.env.REPO || 'Plangsr/3d-bookshelf';
+const branch = process.env.BRANCH || 'main';
+const author = process.env.COMMIT_AUTHOR || 'Plangsr';
+const commitMsg = (process.env.COMMIT_MSG || 'Update').trim();
+const commitUrl = process.env.COMMIT_URL || `https://github.com/${repo}`;
 const commitSha = (process.env.COMMIT_SHA || '0000000').slice(0, 7);
+const liveUrl = 'https://3d-bookshelf-eosin.vercel.app';
 
-const color = isSuccess ? 0xffd700 : 0xff0044; // สีทองเมื่อสำเร็จ, สีแดงเมื่อล้มเหลว
-const statusTitle = isSuccess
-  ? '✨ พันธนาการถูกปลดปล่อย! Deploy สำเร็จลุล่วง 🚀'
-  : '💀 หายนะแห่งความว่างเปล่า! Deploy ล้มเหลว ❌';
+const avatarUrl =
+  process.env.DISCORD_AVATAR_URL ||
+  'https://appointment-scedule.vercel.app/eye-avatar.jpg';
 
-// Exact payload structure matching Appointment Schedule's Vercel Webhook notification
+// Discord Embed Format - Exact layout matching Image 2, triggering purely on Deploy Status
 const payload = {
   username: 'The Eye of Providence',
-  avatar_url: 'https://appointment-scedule.vercel.app/eye-avatar.jpg',
+  avatar_url: avatarUrl,
   embeds: [
     {
-      title: statusTitle,
-      description: `**ดินแดน:** \`${projectName}\`\n**พันธสัญญา (Commit):** ${commitMsg}`,
+      title: isSuccess
+        ? '✨ พันธนาการถูกปลดปล่อย! อัปเดตหอสมุด 3D เรียบร้อย'
+        : '💀 หายนะแห่งความว่างเปล่า! Deploy ล้มเหลว',
       url: liveUrl,
-      color: color,
+      color: isSuccess ? 0xffd700 : 0xff0044, // สีทองตามรูปที่ 2 (หรือแดงถ้าล้มเหลว)
+      description: [
+        isSuccess
+          ? '🔮 **เนตรแห่งโชคชะตาตรวจพบการร่ายเวทย์ใหม่ลงสู่ห้วงมิติชั้นหนังสือ**'
+          : '⚠️ **เนตรแห่งโชคชะตาตรวจพบข้อผิดพลาดในการ Deploy สู่มิติ**',
+        '',
+        '```yaml',
+        commitMsg,
+        '```'
+      ].join('\n'),
       fields: [
-        { 
-          name: '🌐 ทางเข้ามิติ (URL)', 
-          value: liveUrl, 
-          inline: false 
+        {
+          name: '🌌 ข้อมูลมิติ & สายธาร',
+          value: `• **คลัง:** \`${repo}\`\n• **สาขา:** \`${branch}\``,
+          inline: true
+        },
+        {
+          name: '🧙‍♂️ ผู้ร่ายมนตรา',
+          value: `• **ผู้ทำรายการ:** \`${author}\``,
+          inline: true
+        },
+        {
+          name: '🔗 บันทึก & ทางเข้ามิติ',
+          value: `[🌐 เปิดหน้าชั้นหนังสือ 3D](${liveUrl})  •  [📜 ตรวจสอบ Commit \`${commitSha}\`](${commitUrl})`,
+          inline: false
         }
       ],
       footer: {
@@ -59,7 +81,7 @@ const req = https.request(
   },
   (res) => {
     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-      console.log('Successfully sent Discord deployment notification:', res.statusCode);
+      console.log('Successfully sent Discord notification:', res.statusCode);
       process.exit(0);
     } else {
       console.error('Failed to send Discord notification, status:', res.statusCode);
