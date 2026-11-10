@@ -1,0 +1,74 @@
+name: Discord Status Notification
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js project
+        run: npm run build
+
+      - name: Notify Discord on Success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" -X POST -d '{
+            "embeds": [{
+              "title": "✅ GitHub Build & Status: SUCCESS",
+              "description": "**Repository:** 3d-bookshelf\n**Branch:** `main`\n**Commit:** '"${{ github.event.head_commit.message }}"'\n**Author:** '"${{ github.actor }}"'",
+              "color": 5763719,
+              "fields": [
+                {
+                  "name": "Live Vercel Site",
+                  "value": "[Open 3D Bookshelf](https://3d-bookshelf-4nkvgxst0-work-on-lan.vercel.app)",
+                  "inline": true
+                },
+                {
+                  "name": "Commit Link",
+                  "value": "[View Commit](${{ github.event.head_commit.url }})",
+                  "inline": true
+                }
+              ],
+              "footer": {
+                "text": "3D Bookshelf CI/CD Notification"
+              },
+              "timestamp": "'"${{ github.event.head_commit.timestamp }}"'"
+            }]
+          }' ${{ secrets.DISCORD_WEBHOOK }}
+
+      - name: Notify Discord on Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" -X POST -d '{
+            "embeds": [{
+              "title": "❌ GitHub Build & Status: FAILED",
+              "description": "**Repository:** 3d-bookshelf\n**Branch:** `main`\n**Commit:** '"${{ github.event.head_commit.message }}"'\n**Author:** '"${{ github.actor }}"'",
+              "color": 15548997,
+              "fields": [
+                {
+                  "name": "Error Details",
+                  "value": "[View GitHub Action Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})",
+                  "inline": false
+                }
+              ],
+              "footer": {
+                "text": "3D Bookshelf CI/CD Notification"
+              }
+            }]
+          }' ${{ secrets.DISCORD_WEBHOOK }}
