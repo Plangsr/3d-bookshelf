@@ -228,10 +228,46 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    e.target.value = '';
+    setIsScanningOcr(true);
+    setScanStatusText('กำลังเตรียมประมวลผลรูปภาพ...');
+
     const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1];
-      await processOcrAndAppendPage(base64, file.type);
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          if (enhanceContrast) {
+            applyDocumentScanFilter(ctx, width, height);
+          }
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+          await processOcrAndAppendPage(compressedBase64, 'image/jpeg');
+        } else {
+          const rawBase64 = (reader.result as string).split(',')[1];
+          await processOcrAndAppendPage(rawBase64, file.type);
+        }
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -322,19 +358,19 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
               <Plus className="w-4 h-4 text-[#e8c170]" />
             </button>
 
-            {/* Scan New Page with OCR */}
+            {/* Scan New Page with Native Camera */}
             <button
-              onClick={startDocumentCamera}
+              onClick={() => pageFileInputRef.current?.click()}
               disabled={isScanningOcr}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#251a13] hover:bg-[#3a281c] text-[#e8c170] border border-[#e8c170]/40 text-xs font-sans transition-all active:scale-95"
-              title="สแกนเพิ่มหน้าหนังสือด้วย OCR"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1917] font-semibold text-xs font-sans shadow transition-all active:scale-95"
+              title="เปิดกล้องมือถือถ่ายเพื่อสแกนเพิ่มหน้า"
             >
               {isScanningOcr ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#e8c170]" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1c1917]" />
               ) : (
-                <Camera className="w-3.5 h-3.5 text-[#e8c170]" />
+                <Camera className="w-3.5 h-3.5 text-[#1c1917]" />
               )}
-              <span className="hidden sm:inline">สแกนเพิ่มหน้า</span>
+              <span className="hidden sm:inline">ถ่ายรูปเพิ่มหน้า</span>
             </button>
 
             {/* Delete Page */}
