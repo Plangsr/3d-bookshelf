@@ -506,7 +506,10 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                onLoadedMetadata={(e) => {
+                  (e.target as HTMLVideoElement).play().catch(() => {});
+                }}
+                className="w-full h-full object-cover bg-black"
               />
               <div className="absolute inset-x-8 inset-y-12 sm:inset-x-16 sm:inset-y-12 border-2 border-[#e8c170] rounded-xl pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-3">
                 <div className="flex justify-between items-start">

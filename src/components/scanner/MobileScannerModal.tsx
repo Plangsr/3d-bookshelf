@@ -296,7 +296,10 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                onLoadedMetadata={(e) => {
+                  (e.target as HTMLVideoElement).play().catch(() => {});
+                }}
+                className="w-full h-full object-cover bg-black"
               />
 
               {/* Document Alignment Frame Box */}
