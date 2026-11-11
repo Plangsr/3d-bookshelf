@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { 
   Camera, 
   Check, 
@@ -10,10 +11,7 @@ import {
   Palette, 
   BookMarked,
   Layers,
-  Sparkles,
   Crop,
-  RotateCw,
-  Sun,
   Contrast
 } from 'lucide-react';
 import { Book, BookPage } from '@/types/book';
@@ -48,7 +46,7 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
   const [fontSize, setFontSize] = useState(18);
   const [textColor, setTextColor] = useState('#1c1917');
   const [bgColor, setBgColor] = useState('#faf7f2');
-  const [fontFamily, setFontFamily] = useState('serif');
+  const [fontFamily] = useState('serif');
 
   // OCR Processing Status
   const [isProcessingOcr, setIsProcessingOcr] = useState(false);
@@ -67,20 +65,20 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
   const spineInputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
 
-  // Stop camera when closing modal or unmounting
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
       setCameraStream(null);
     }
     setIsLiveCameraOpen(false);
-  };
+  }, [cameraStream]);
+
+  // Stop camera when closing modal or unmounting
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   // Start Live Document Camera with HD resolution & auto-focus
   const startDocumentCamera = async () => {
@@ -130,9 +128,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     // Stop camera feed after capture
     stopCamera();
 
-    // Process with Gemini OCR
+    // Process with OCR
     const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-    await processOcrWithGemini(base64Data, 'image/jpeg');
+    await processOcr(base64Data, 'image/jpeg');
   };
 
   // Image Processing Filter for Crisp Document Scanning
@@ -153,28 +151,27 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     ctx.putImageData(imgData, 0, 0);
   };
 
-  // Process OCR using Google Gemini AI
-  const processOcrWithGemini = async (base64: string, mimeType: string) => {
+  // Process OCR using robust offline-capable Tesseract OCR
+  const processOcr = async (base64: string, mimeType: string) => {
     setIsProcessingOcr(true);
-    setOcrStatusText('กำลังใช้ Gemini AI ถอดข้อความภาษาไทย/อังกฤษ...');
+    setOcrStatusText('กำลังใช้ระบบ OCR สแกนถอดข้อความและจัดรูปแบบ...');
 
     try {
-      const res = await fetch('/api/gemini-scan', {
+      const res = await fetch('/api/ocr-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: base64,
           mimeType,
-          mode: 'ocr',
         }),
       });
 
       const data = await res.json();
       if (data.success && data.text) {
         setCurrentPageText(data.text);
-        setOcrStatusText('สแกนเอกสารสำเร็จ!');
+        setOcrStatusText('สแกนและจัดรูปแบบข้อความสำเร็จ!');
       } else {
-        alert('ไม่สามารถถอดข้อความได้ กรุณาลองถ่ายใหม่อีกครั้ง');
+        alert(data.error || 'ไม่สามารถถอดข้อความได้ กรุณาลองถ่ายใหม่อีกครั้ง');
       }
     } catch (err) {
       console.error('OCR Error:', err);
@@ -192,7 +189,7 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     const reader = new FileReader();
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1];
-      await processOcrWithGemini(base64, file.type);
+      await processOcr(base64, file.type);
     };
     reader.readAsDataURL(file);
   };
@@ -401,12 +398,12 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
               </div>
             </div>
 
-            {/* Clothbound Color Palette */}
+            {/* Clothbound Color Palette & Foil */}
             <div>
               <label className="block text-xs uppercase tracking-wider text-[#a8998a] mb-2">
                 สีผ้าหุ้มปก (Clothbound Fabric)
               </label>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 mb-3">
                 {[
                   { name: 'Navy', hex: '#1e293b' },
                   { name: 'Burgundy', hex: '#4c171e' },
@@ -427,6 +424,24 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                   />
                 ))}
               </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-[#a8998a]">สีฟอยล์ตัวอักษร:</span>
+                {(['gold', 'silver', 'copper'] as const).map((foil) => (
+                  <button
+                    key={foil}
+                    type="button"
+                    onClick={() => setFoilColor(foil)}
+                    className={`px-2.5 py-1 rounded text-xs capitalize border transition-colors ${
+                      foilColor === foil
+                        ? 'border-[#e8c170] text-[#e8c170] bg-[#2a1e16]'
+                        : 'border-[#3d2e23] text-[#8c7e70]'
+                    }`}
+                  >
+                    {foil}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 3-Side Cover Scanning */}
@@ -440,7 +455,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                 <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
                   <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">1. ปกหน้า</span>
                   {frontCoverPreview ? (
-                    <img src={frontCoverPreview} alt="Front" className="h-20 object-contain rounded mb-1.5 shadow" />
+                    <div className="relative h-20 w-16 mb-1.5 shadow">
+                      <Image src={frontCoverPreview} alt="Front" fill className="object-contain rounded" unoptimized />
+                    </div>
                   ) : (
                     <Camera className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}
@@ -467,7 +484,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                 <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
                   <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">2. สันปก</span>
                   {spineCoverPreview ? (
-                    <img src={spineCoverPreview} alt="Spine" className="h-20 object-contain rounded mb-1.5 shadow" />
+                    <div className="relative h-20 w-16 mb-1.5 shadow">
+                      <Image src={spineCoverPreview} alt="Spine" fill className="object-contain rounded" unoptimized />
+                    </div>
                   ) : (
                     <Layers className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}
@@ -494,7 +513,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
                 <div className="border border-dashed border-[#4a392c] rounded-xl p-3 flex flex-col items-center justify-center bg-[#130e0b]">
                   <span className="text-[11px] font-medium text-[#c8bba9] mb-1.5">3. ปกหลัง</span>
                   {backCoverPreview ? (
-                    <img src={backCoverPreview} alt="Back" className="h-20 object-contain rounded mb-1.5 shadow" />
+                    <div className="relative h-20 w-16 mb-1.5 shadow">
+                      <Image src={backCoverPreview} alt="Back" fill className="object-contain rounded" unoptimized />
+                    </div>
                   ) : (
                     <Camera className="w-6 h-6 text-[#6d5b4d] mb-1.5" />
                   )}

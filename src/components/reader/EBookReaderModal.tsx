@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   X, 
   ChevronLeft, 
@@ -9,8 +9,10 @@ import {
   Check, 
   Plus, 
   Trash2,
-  Type,
-  Palette
+  Camera,
+  Crop,
+  Contrast,
+  Loader2
 } from 'lucide-react';
 import { Book, BookPage } from '@/types/book';
 
@@ -32,6 +34,31 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
   // Edit Mode States
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState('');
+
+  // OCR Scan States for Reader
+  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [enhanceContrast, setEnhanceContrast] = useState(true);
+  const [isScanningOcr, setIsScanningOcr] = useState(false);
+  const [scanStatusText, setScanStatusText] = useState('');
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pageFileInputRef = useRef<HTMLInputElement>(null);
+
+  const stopCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsLiveCameraOpen(false);
+  }, [cameraStream]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   if (!book) return null;
 
@@ -84,6 +111,111 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
     setCurrentPageIndex(updatedPages.length - 1);
     setEditedText(newPage.text);
     setIsEditing(true);
+  };
+
+  // Start live camera scanner
+  const startDocumentCamera = async () => {
+    try {
+      setIsLiveCameraOpen(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch {
+      pageFileInputRef.current?.click();
+      setIsLiveCameraOpen(false);
+    }
+  };
+
+  // Contrast filter for document scan
+  const applyDocumentScanFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const enhanced = gray > 140 ? Math.min(255, gray * 1.25) : Math.max(0, gray * 0.75);
+      data[i] = enhanced;
+      data[i + 1] = enhanced;
+      data[i + 2] = enhanced;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  // Perform OCR and append as a new page
+  const processOcrAndAppendPage = async (base64: string, mimeType: string) => {
+    setIsScanningOcr(true);
+    setScanStatusText('กำลังสแกนถอดข้อความ OCR...');
+
+    try {
+      const res = await fetch('/api/ocr-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType }),
+      });
+      const data = await res.json();
+      if (data.success && data.text) {
+        const newPageNum = pages.length + 1;
+        const newPage: BookPage = {
+          pageNumber: newPageNum,
+          text: data.text,
+          fontSize: 18,
+        };
+        const updatedPages = [...pages, newPage];
+        const updatedBook: Book = {
+          ...book,
+          pages: updatedPages,
+        };
+        onUpdateBook?.(updatedBook);
+        setCurrentPageIndex(updatedPages.length - 1);
+        setIsEditing(false);
+      } else {
+        alert(data.error || 'ไม่สามารถถอดข้อความได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      console.error('OCR Error:', err);
+      alert('เกิดข้อผิดพลาดในการสแกน OCR');
+    } finally {
+      setIsScanningOcr(false);
+      setScanStatusText('');
+    }
+  };
+
+  const captureDocumentFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (enhanceContrast) {
+      applyDocumentScanFilter(ctx, canvas.width, canvas.height);
+    }
+    stopCamera();
+
+    const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    await processOcrAndAppendPage(base64Data, 'image/jpeg');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      await processOcrAndAppendPage(base64, file.type);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeletePage = () => {
@@ -163,13 +295,28 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
               </button>
             )}
 
-            {/* Add New Page */}
+            {/* Add New Page (Manual) */}
             <button
               onClick={handleAddNewPage}
               className="p-1.5 rounded-lg bg-[#251a13] hover:bg-[#33241b] text-[#cfc2b4] border border-[#3d2e23] transition-colors"
-              title="เพิ่มหน้าใหม่"
+              title="เพิ่มหน้าว่างใหม่"
             >
               <Plus className="w-4 h-4 text-[#e8c170]" />
+            </button>
+
+            {/* Scan New Page with OCR */}
+            <button
+              onClick={startDocumentCamera}
+              disabled={isScanningOcr}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#251a13] hover:bg-[#3a281c] text-[#e8c170] border border-[#e8c170]/40 text-xs font-sans transition-all active:scale-95"
+              title="สแกนเพิ่มหน้าหนังสือด้วย OCR"
+            >
+              {isScanningOcr ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#e8c170]" />
+              ) : (
+                <Camera className="w-3.5 h-3.5 text-[#e8c170]" />
+              )}
+              <span className="hidden sm:inline">สแกนเพิ่มหน้า</span>
             </button>
 
             {/* Delete Page */}
@@ -284,9 +431,16 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
             <span className="hidden xs:inline">หน้าที่แล้ว</span>
           </button>
 
-          <span className="tracking-widest text-[11px] sm:text-xs">
-            หน้า {currentPageIndex + 1} จาก {pages.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="tracking-widest text-[11px] sm:text-xs">
+              หน้า {currentPageIndex + 1} จาก {pages.length}
+            </span>
+            {isScanningOcr && (
+              <span className="text-[11px] text-[#e8c170] flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> {scanStatusText}
+              </span>
+            )}
+          </div>
 
           <button
             onClick={() => {
@@ -300,6 +454,90 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Hidden File Input & Canvas for Reader OCR */}
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          ref={pageFileInputRef}
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Live Document Scanner Camera Fullscreen Overlay */}
+        {isLiveCameraOpen && (
+          <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
+            <div className="w-full flex items-center justify-between z-10 text-white">
+              <div className="flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full text-xs">
+                <Crop className="w-4 h-4 text-[#e8c170]" />
+                <span>สแกนหน้าหนังสือเพิ่มเข้าในเล่มนี้</span>
+              </div>
+              <button
+                onClick={stopCamera}
+                className="p-2 rounded-full bg-black/60 text-white hover:bg-black/90"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="relative w-full flex-1 flex items-center justify-center overflow-hidden my-3 rounded-2xl border border-white/20">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-x-8 inset-y-12 sm:inset-x-16 sm:inset-y-12 border-2 border-[#e8c170] rounded-xl pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-3">
+                <div className="flex justify-between items-start">
+                  <div className="w-6 h-6 border-t-4 border-l-4 border-[#ffd98c] -mt-1 -ml-1 rounded-tl-sm" />
+                  <div className="w-6 h-6 border-t-4 border-r-4 border-[#ffd98c] -mt-1 -mr-1 rounded-tr-sm" />
+                </div>
+                <div className="text-center bg-black/70 py-1 px-3 rounded-full text-[11px] text-[#e8c170] self-center">
+                  จัดหน้ากระดาษให้อยู่ในกรอบนี้
+                </div>
+                <div className="flex justify-between items-end">
+                  <div className="w-6 h-6 border-b-4 border-l-4 border-[#ffd98c] -mb-1 -ml-1 rounded-bl-sm" />
+                  <div className="w-6 h-6 border-b-4 border-r-4 border-[#ffd98c] -mb-1 -mr-1 rounded-br-sm" />
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full flex items-center justify-around z-10 pb-2">
+              <button
+                onClick={() => setEnhanceContrast(!enhanceContrast)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                  enhanceContrast ? 'bg-[#e8c170] text-[#1c1917] font-bold' : 'bg-white/20 text-white'
+                }`}
+              >
+                <Contrast className="w-3.5 h-3.5" />
+                <span>โหมดขาวดำชัดเจน</span>
+              </button>
+
+              <button
+                onClick={captureDocumentFrame}
+                className="w-16 h-16 rounded-full border-4 border-white bg-[#e8c170] flex items-center justify-center shadow-2xl active:scale-95 transition-transform"
+                title="กดถ่ายสแกนเพิ่มหน้านี้"
+              >
+                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-[#1c1917]" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  stopCamera();
+                  pageFileInputRef.current?.click();
+                }}
+                className="text-xs text-[#cfc2b4] hover:text-white underline"
+              >
+                อัปโหลดรูป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
