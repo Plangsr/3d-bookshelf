@@ -80,26 +80,45 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     };
   }, [stopCamera]);
 
-  // Start Live Document Camera with HD resolution & auto-focus
+  // Assign stream to video when stream or camera state updates
+  useEffect(() => {
+    if (isLiveCameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch((err) => {
+        console.warn('Video play error:', err);
+      });
+    }
+  }, [isLiveCameraOpen, cameraStream]);
+
+  // Start Live Document Camera with progressive fallback
   const startDocumentCamera = async () => {
     try {
-      setIsLiveCameraOpen(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' }, // Back camera on mobile
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('MediaDevices API not supported or insecure origin');
+      }
+
+      let stream: MediaStream | null = null;
+      try {
+        // Try ideal back camera with HD
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+      } catch {
+        // Fallback to any available video camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+      }
 
       setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
-      console.warn('Cannot open direct camera stream, fallback to native camera intent:', err);
-      // Fallback to native capture input
+      setIsLiveCameraOpen(true);
+    } catch (err: any) {
+      console.warn('Cannot open direct camera stream, fallback to native camera file input:', err);
+      // Fallback directly to native camera intent
       pageInputRef.current?.click();
       setIsLiveCameraOpen(false);
     }

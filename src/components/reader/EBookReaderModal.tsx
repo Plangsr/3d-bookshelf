@@ -113,22 +113,40 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
     setIsEditing(true);
   };
 
+  // Assign stream to video when stream or camera state updates
+  useEffect(() => {
+    if (isLiveCameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch((err) => {
+        console.warn('Video play error:', err);
+      });
+    }
+  }, [isLiveCameraOpen, cameraStream]);
+
   // Start live camera scanner
   const startDocumentCamera = async () => {
     try {
-      setIsLiveCameraOpen(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      });
-      setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('MediaDevices API not supported or insecure origin');
       }
+
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+      }
+
+      setCameraStream(stream);
+      setIsLiveCameraOpen(true);
     } catch {
       pageFileInputRef.current?.click();
       setIsLiveCameraOpen(false);
