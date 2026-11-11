@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import path from 'path';
 import { createWorker } from 'tesseract.js';
 
 /**
@@ -21,7 +22,7 @@ function formatOcrText(rawText: string): string {
   const cleanedParagraphs: string[] = [];
   let currentPara: string[] = [];
 
-  for (let line of lines) {
+  for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
       if (currentPara.length > 0) {
@@ -58,19 +59,30 @@ function formatOcrText(rawText: string): string {
 export async function POST(req: Request) {
   let worker: any = null;
   try {
-    const { imageBase64, mimeType = 'image/jpeg' } = await req.json();
+    const { imageBase64 } = await req.json();
 
     if (!imageBase64) {
       return NextResponse.json({ error: 'No image data provided' }, { status: 400 });
     }
 
-    // Convert Base64 data to Buffer for Tesseract OCR processing
+    // Convert Base64 data to Buffer
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(cleanBase64, 'base64');
 
-    // Initialize Tesseract OCR worker with Thai and English language models
+    // In Next.js bundled environment, explicitly provide workerPath and langPath
+    const workerPath = path.join(
+      process.cwd(),
+      'node_modules',
+      'tesseract.js',
+      'src',
+      'worker-script',
+      'node',
+      'index.js'
+    );
+
     worker = await createWorker(['tha', 'eng'], 1, {
-      errorHandler: (err) => console.error('Tesseract worker error:', err),
+      workerPath,
+      errorHandler: (err: any) => console.error('Tesseract worker error:', err),
     });
 
     const result = await worker.recognize(imageBuffer);
@@ -82,7 +94,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      text: formattedMarkdown || rawText || '(ไม่พบข้อความในภาพ)',
+      text: formattedMarkdown || rawText || '(ไม่พบข้อความในภาพ กรุณาถ่ายใหม่อีกครั้ง)',
       confidence: result.data.confidence,
     });
   } catch (error: any) {
@@ -100,4 +112,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
