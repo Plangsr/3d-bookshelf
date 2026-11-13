@@ -41,6 +41,7 @@ import type {
   ShopProfile,
   VatMode,
 } from '@/types/shirt';
+import { FreeNumberInput } from './FreeNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
 
 export interface ReceiptStudioModalProps {
@@ -679,69 +680,77 @@ const ReceiptStudioContent: React.FC<Omit<ReceiptStudioModalProps, 'isOpen'>> = 
                 <div className="p-3 rounded-xl bg-[#130d0a] border border-[#4a3728] grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
                   <div>
                     <label className="block text-[10px] text-[#a79786] mb-1">กว้าง (mm)</label>
-                    <input
-                      type="number"
-                      min={30}
+                    <FreeNumberInput
+                      min={5}
                       max={450}
+                      allowDecimal
+                      step={1}
                       value={activePaperSize.widthMm}
-                      onChange={(e) =>
-                        handleInlinePaperPatch({
-                          widthMm: Math.max(30, Number(e.target.value) || 80),
-                        })
+                      onChangeNumber={(nextVal) =>
+                        handleInlinePaperPatch({ widthMm: nextVal })
                       }
+                      aria-label="ความกว้างกระดาษ mm"
                       className="w-full px-2 py-1.5 rounded-lg bg-[#1d1510] border border-[#443326] text-xs font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-[#a79786] mb-1">
-                      สูง (ว่าง=Auto)
-                    </label>
-                    <input
-                      type="number"
-                      min={30}
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] text-[#a79786]">สูง (mm)</label>
+                      <label className="flex items-center gap-1 text-[10px] text-[#e8c170] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={activePaperSize.heightMm === null}
+                          onChange={(e) =>
+                            handleInlinePaperPatch({
+                              heightMm: e.target.checked ? null : 150,
+                            })
+                          }
+                        />
+                        <span>Auto</span>
+                      </label>
+                    </div>
+                    <FreeNumberInput
+                      min={5}
                       max={600}
-                      value={activePaperSize.heightMm ?? ''}
+                      allowDecimal
+                      step={1}
+                      disabled={activePaperSize.heightMm === null}
+                      value={activePaperSize.heightMm}
                       placeholder="Auto"
-                      onChange={(e) =>
-                        handleInlinePaperPatch({
-                          heightMm:
-                            e.target.value === ''
-                              ? null
-                              : Math.max(30, Number(e.target.value) || 150),
-                        })
+                      onChangeNumber={(nextVal) =>
+                        handleInlinePaperPatch({ heightMm: nextVal })
                       }
-                      className="w-full px-2 py-1.5 rounded-lg bg-[#1d1510] border border-[#443326] text-xs font-mono"
+                      aria-label="ความสูงกระดาษ mm"
+                      className="w-full px-2 py-1.5 rounded-lg bg-[#1d1510] border border-[#443326] disabled:opacity-45 text-xs font-mono"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] text-[#a79786] mb-1">ขอบ (mm)</label>
-                    <input
-                      type="number"
+                    <FreeNumberInput
                       min={0}
                       max={40}
+                      allowDecimal
                       step={0.5}
                       value={activePaperSize.marginMm}
-                      onChange={(e) =>
-                        handleInlinePaperPatch({
-                          marginMm: Math.max(0, Number(e.target.value) || 0),
-                        })
+                      onChangeNumber={(nextVal) =>
+                        handleInlinePaperPatch({ marginMm: nextVal })
                       }
+                      aria-label="ระยะขอบกระดาษ mm"
                       className="w-full px-2 py-1.5 rounded-lg bg-[#1d1510] border border-[#443326] text-xs font-mono"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] text-[#a79786] mb-1">ฟอนต์ (x)</label>
-                    <input
-                      type="number"
-                      min={0.6}
-                      max={1.6}
+                    <FreeNumberInput
+                      min={0.5}
+                      max={1.8}
+                      allowDecimal
                       step={0.05}
                       value={activePaperSize.fontScale}
-                      onChange={(e) =>
-                        handleInlinePaperPatch({
-                          fontScale: Math.max(0.6, Math.min(1.6, Number(e.target.value) || 1)),
-                        })
+                      onChangeNumber={(nextVal) =>
+                        handleInlinePaperPatch({ fontScale: nextVal })
                       }
+                      aria-label="สเกลฟอนต์"
                       className="w-full px-2 py-1.5 rounded-lg bg-[#1d1510] border border-[#443326] text-xs font-mono"
                     />
                   </div>

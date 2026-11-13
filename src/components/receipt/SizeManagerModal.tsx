@@ -118,10 +118,10 @@ const SizeManagerContent: React.FC<Omit<SizeManagerModalProps, 'isOpen'>> = ({
       return;
     }
 
-    const widthMm = Math.max(30, Math.min(450, Number(paperForm.widthMm) || 80));
+    const widthMm = Math.max(5, Math.min(450, Number(paperForm.widthMm) || 80));
     const heightMm = paperForm.isAutoRoll
       ? null
-      : Math.max(30, Math.min(600, Number(paperForm.heightMm) || 150));
+      : Math.max(5, Math.min(600, Number(paperForm.heightMm) || 150));
     const marginMm = Math.max(0, Math.min(40, Number(paperForm.marginMm) || 0));
     const fontScale = Math.max(0.6, Math.min(1.8, Number(paperForm.fontScale) || 1));
 
@@ -523,7 +523,7 @@ const SizeManagerContent: React.FC<Omit<SizeManagerModalProps, 'isOpen'>> = ({
                     </label>
                     <input
                       type="number"
-                      min={30}
+                      min={5}
                       max={450}
                       step={1}
                       value={paperForm.widthMm}
@@ -538,7 +538,7 @@ const SizeManagerContent: React.FC<Omit<SizeManagerModalProps, 'isOpen'>> = ({
                     </label>
                     <input
                       type="number"
-                      min={30}
+                      min={5}
                       max={600}
                       step={1}
                       disabled={paperForm.isAutoRoll}

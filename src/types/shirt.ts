@@ -91,6 +91,10 @@ export interface StickerConfig {
   barcodeCaption: string;
   borderRadiusMm: number;
   showCutBorder: boolean;
+  /** Optional multiplier (%) on top of automatic sticker-size text scaling (default 100) */
+  fontScalePct?: number;
+  /** Detail spacing mode: 'auto' shrinks padding/gaps when sticker <= 36x46mm */
+  detailDensity?: 'auto' | 'compact' | 'normal';
 }
 
 export interface StickerSet {

@@ -13,6 +13,7 @@ import type {
   PrintLayoutCalibration,
   ReceiptPaperSize,
 } from '@/types/shirt';
+import { FreeNumberInput } from './FreeNumberInput';
 import { PrinterSelectorCard } from './PrinterSelectorCard';
 import { PrintPositionMap } from './PrintPositionMap';
 
@@ -350,16 +351,15 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
                             onClick={(e) => e.stopPropagation()}
                           >
                             <span className="text-[11px] text-[#a99784]">จำนวน:</span>
-                            <input
-                              type="number"
+                            <FreeNumberInput
                               min={1}
                               max={2000}
+                              step={1}
                               value={doc.copies}
-                              onChange={(e) =>
-                                updateDoc(doc.id, {
-                                  copies: Math.min(2000, Math.max(1, Number(e.target.value) || 1)),
-                                })
+                              onChangeNumber={(nextCopies) =>
+                                updateDoc(doc.id, { copies: nextCopies })
                               }
+                              aria-label="จำนวนสำเนา"
                               className="w-20 px-2 py-1 rounded-lg bg-[#1a130e] border border-[#443326] text-xs font-mono text-[#faf5ee]"
                             />
                             <span className="text-[11px] text-[#a99784]">ใบ</span>

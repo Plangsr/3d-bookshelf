@@ -36,6 +36,7 @@ import type {
   Shirt,
   ShopProfile,
 } from '@/types/shirt';
+import { FreeNumberInput } from './FreeNumberInput';
 import { PrintPositionMap } from './PrintPositionMap';
 import { QuickUploadPrinter } from './QuickUploadPrinter';
 import { ReceiptPreview } from './ReceiptPreview';
@@ -860,14 +861,13 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                     {n.toLocaleString()} ใบ
                   </button>
                 ))}
-                <input
-                  type="number"
+                <FreeNumberInput
                   min={1}
                   max={2000}
+                  step={1}
                   value={copies}
-                  onChange={(e) =>
-                    setCopies(Math.min(2000, Math.max(1, Number(e.target.value) || 1)))
-                  }
+                  onChangeNumber={setCopies}
+                  aria-label="จำนวนใบเสร็จ"
                   className="w-24 px-3 py-1.5 rounded-lg bg-[#120d0a] border border-[#443326] text-xs font-mono text-[#faf5ee]"
                 />
               </div>

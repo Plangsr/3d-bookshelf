@@ -28,6 +28,7 @@ import type {
   StickerConfig,
   StickerSet,
 } from '@/types/shirt';
+import { FreeNumberInput } from './FreeNumberInput';
 import { PrinterSelectorCard } from './PrinterSelectorCard';
 import { PrintPositionMap } from './PrintPositionMap';
 import { StickerLabelPreview } from './StickerLabelPreview';
@@ -40,10 +41,18 @@ interface StickerStudioProps {
 }
 
 const STICKER_QUICK_SIZES: { label: string; w: number; h: number; m: number }[] = [
+  { label: 'สติกเกอร์เล็ก 30×40mm', w: 30, h: 40, m: 1.5 },
+  { label: 'สติกเกอร์ 40×60mm', w: 40, h: 60, m: 2 },
   { label: 'สติกเกอร์เสื้อ 50×70mm', w: 50, h: 70, m: 2 },
   { label: 'สติกเกอร์กลาง 58×80mm', w: 58, h: 80, m: 2 },
-  { label: 'สติกเกอร์เล็ก 40×60mm', w: 40, h: 60, m: 2 },
   { label: 'A4 แผ่นรวม (210×297mm)', w: 210, h: 297, m: 8 },
+];
+
+const FONT_SCALE_PRESETS: { label: string; pct: number }[] = [
+  { label: '70% เล็กมาก', pct: 70 },
+  { label: '85% กะทัดรัด', pct: 85 },
+  { label: '100% พอดีกรอบ', pct: 100 },
+  { label: '115% ใหญ่', pct: 115 },
 ];
 
 const QUICK_SIZE_CHIPS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Freesize'];
@@ -99,13 +108,16 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     barcodeCaption: `${shirts[0]?.sku || 'AT-TEE-01'}-L`,
     borderRadiusMm: 2,
     showCutBorder: true,
+    fontScalePct: 100,
+    detailDensity: 'auto',
   }));
 
   const [copies, setCopies] = useState<number>(10);
   const [printLayoutMode, setPrintLayoutMode] = useState<'single' | 'grid'>('single');
-  const [gridColumns, setGridColumns] = useState<number>(3);
-  const [gridGapMm, setGridGapMm] = useState<number>(4);
-  const [stickerBoxWidthMm, setStickerBoxWidthMm] = useState<number>(50);
+  const [gridColumns, setGridColumns] = useState<number>(6);
+  const [gridGapMm, setGridGapMm] = useState<number>(3);
+  const [stickerBoxWidthMm, setStickerBoxWidthMm] = useState<number>(30);
+  const [stickerBoxHeightMm, setStickerBoxHeightMm] = useState<number>(40);
   const [activeBatchCopies, setActiveBatchCopies] = useState<number>(0);
   const [statusText, setStatusText] = useState<string>('');
 
@@ -245,24 +257,31 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     });
   };
 
-  // Chunk into pages when printing A4 multi-sticker grid
-  const gridPages = useMemo(() => {
-    if (activeBatchCopies <= 0 || printLayoutMode !== 'grid') return [];
+  // Compute grid fit metrics for multi-up A4/A5 sheet mode and Map preview
+  const gridFitStats = useMemo(() => {
     const safeW = Math.max(
-      20,
+      10,
       calibration.paperWidthMm - calibration.marginLeftMm - calibration.marginRightMm
     );
     const safeH = Math.max(
-      30,
+      10,
       (calibration.paperHeightMm ?? 297) -
         calibration.marginTopMm -
         calibration.marginBottomMm
     );
-    const approxStickerH = stickerBoxWidthMm * 1.35 + gridGapMm;
-    const rowsPerPage = Math.max(1, Math.floor((safeH + gridGapMm) / approxStickerH));
-    const cols = Math.max(1, Math.min(8, Math.floor(safeW / stickerBoxWidthMm) || gridColumns));
+    const cellW = Math.max(8, stickerBoxWidthMm);
+    const cellH = Math.max(8, stickerBoxHeightMm);
+    const fitCols = Math.max(1, Math.floor((safeW + gridGapMm) / (cellW + gridGapMm)));
+    const cols = Math.max(1, Math.min(gridColumns, fitCols));
+    const rowsPerPage = Math.max(1, Math.floor((safeH + gridGapMm) / (cellH + gridGapMm)));
     const perPage = Math.max(1, rowsPerPage * cols);
+    return { cols, rowsPerPage, perPage };
+  }, [calibration, stickerBoxWidthMm, stickerBoxHeightMm, gridGapMm, gridColumns]);
 
+  // Chunk into pages when printing A4 multi-sticker grid
+  const gridPages = useMemo(() => {
+    if (activeBatchCopies <= 0 || printLayoutMode !== 'grid') return [];
+    const { perPage } = gridFitStats;
     const pages: number[][] = [];
     for (let i = 0; i < activeBatchCopies; i += perPage) {
       pages.push(
@@ -270,7 +289,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       );
     }
     return pages;
-  }, [activeBatchCopies, printLayoutMode, calibration, stickerBoxWidthMm, gridGapMm, gridColumns]);
+  }, [activeBatchCopies, printLayoutMode, gridFitStats]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -521,6 +540,79 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               </label>
             </div>
           </div>
+
+          {/* Text & Detail Scaling Controls (Auto + Fine-Tune for small 30x40 labels) */}
+          <div className="pt-2 border-t border-[#2d2118] space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] font-semibold text-[#d6c8b6]">
+                ขนาดตัวอักษร &amp; รายละเอียด ({config.fontScalePct ?? 100}% • ปรับตามขนาดสติกเกอร์อัตโนมัติ)
+              </div>
+              <div className="flex items-center gap-1.5">
+                <FreeNumberInput
+                  min={45}
+                  max={160}
+                  step={5}
+                  value={config.fontScalePct ?? 100}
+                  onChangeNumber={(pct) => patchConfig({ fontScalePct: pct })}
+                  aria-label="สัดส่วนขนาดตัวอักษรเปอร์เซ็นต์"
+                  className="w-16 px-2 py-0.5 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee] text-center"
+                />
+                <span className="text-[11px] text-[#a99784]">%</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="range"
+                min={50}
+                max={150}
+                step={5}
+                value={config.fontScalePct ?? 100}
+                onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
+                className="flex-1 min-w-[140px] accent-[#e8c170]"
+              />
+              <div className="flex flex-wrap gap-1">
+                {FONT_SCALE_PRESETS.map((p) => (
+                  <button
+                    key={p.pct}
+                    type="button"
+                    onClick={() => patchConfig({ fontScalePct: p.pct })}
+                    className={`px-2 py-0.5 rounded-md border text-[10px] ${
+                      (config.fontScalePct ?? 100) === p.pct
+                        ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
+                        : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21]'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="text-[#a99784] mr-1">ความกระชับช่องไฟ:</span>
+              {(
+                [
+                  { id: 'auto', label: 'อัตโนมัติ (กระชับเมื่อ ≤ 36mm)' },
+                  { id: 'compact', label: 'กระชับพิเศษ (เหมาะ 30×40)' },
+                  { id: 'normal', label: 'โปร่ง (สติกเกอร์ใหญ่)' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => patchConfig({ detailDensity: opt.id })}
+                  className={`px-2 py-0.5 rounded-md border text-[10px] ${
+                    (config.detailDensity ?? 'auto') === opt.id
+                      ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98] font-bold'
+                      : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 2. Named Sticker Sets */}
@@ -656,43 +748,62 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
 
           {printLayoutMode === 'grid' && (
-            <div className="grid grid-cols-3 gap-2 bg-[#120d0a] p-2.5 rounded-xl border border-[#32241a] text-xs">
-              <div>
-                <label className="block text-[10px] text-[#a99784]">กว้างสติกเกอร์ (mm)</label>
-                <input
-                  type="number"
-                  min={25}
-                  max={120}
-                  value={stickerBoxWidthMm}
-                  onChange={(e) =>
-                    setStickerBoxWidthMm(Math.max(25, Number(e.target.value) || 50))
-                  }
-                  className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                />
+            <div className="bg-[#120d0a] p-2.5 rounded-xl border border-[#32241a] space-y-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-[10px] text-[#a99784]">กว้างสติกเกอร์ (mm)</label>
+                  <FreeNumberInput
+                    min={8}
+                    max={150}
+                    allowDecimal
+                    step={1}
+                    value={stickerBoxWidthMm}
+                    onChangeNumber={setStickerBoxWidthMm}
+                    aria-label="ความกว้างสติกเกอร์ต่อดวง mm"
+                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#a99784]">สูงสติกเกอร์ (mm)</label>
+                  <FreeNumberInput
+                    min={8}
+                    max={200}
+                    allowDecimal
+                    step={1}
+                    value={stickerBoxHeightMm}
+                    onChangeNumber={setStickerBoxHeightMm}
+                    aria-label="ความสูงสติกเกอร์ต่อดวง mm"
+                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#a99784]">สูงสุด/แถว (Cols)</label>
+                  <FreeNumberInput
+                    min={1}
+                    max={12}
+                    step={1}
+                    value={gridColumns}
+                    onChangeNumber={setGridColumns}
+                    aria-label="จำนวนดวงต่อแถวสูงสุด"
+                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#a99784]">ช่องไฟ (Gap mm)</label>
+                  <FreeNumberInput
+                    min={0}
+                    max={20}
+                    allowDecimal
+                    step={0.5}
+                    value={gridGapMm}
+                    onChangeNumber={setGridGapMm}
+                    aria-label="ช่องไฟระหว่างสติกเกอร์ mm"
+                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] text-[#a99784]">ดวง/แถว (Cols)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={6}
-                  value={gridColumns}
-                  onChange={(e) =>
-                    setGridColumns(Math.max(1, Math.min(6, Number(e.target.value) || 3)))
-                  }
-                  className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-[#a99784]">ช่องไฟ (Gap mm)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={gridGapMm}
-                  onChange={(e) => setGridGapMm(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                />
+              <div className="text-[10px] text-emerald-300/90 font-mono">
+                จัดเรียงได้ {gridFitStats.cols} × {gridFitStats.rowsPerPage} = {gridFitStats.perPage} ดวง/แผ่น
               </div>
             </div>
           )}
@@ -714,14 +825,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   {n.toLocaleString()}
                 </button>
               ))}
-              <input
-                type="number"
+              <FreeNumberInput
                 min={1}
                 max={2000}
+                step={1}
                 value={copies}
-                onChange={(e) =>
-                  setCopies(Math.min(2000, Math.max(1, Number(e.target.value) || 1)))
-                }
+                onChangeNumber={setCopies}
+                aria-label="จำนวนดวงที่ต้องการพิมพ์"
                 className="w-20 px-2.5 py-1 rounded-lg bg-[#120d0a] border border-[#443326] text-xs font-mono text-[#faf5ee]"
               />
             </div>
@@ -738,7 +848,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
         </div>
       </div>
 
-      {/* Right Column: Interactive Print Position Map with Sticker Preview */}
+      {/* Right Column: Interactive Print Position Map with Dimension-Aware Sticker Preview */}
       <div className="lg:col-span-6 lg:sticky lg:top-16">
         <PrintPositionMap
           paperSizes={paperSizes}
@@ -749,9 +859,44 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           onSaveAsNewPreset={onSavePaperSizes ? handleSaveAsNewPreset : undefined}
           title="Map ระยะขอบ & ตำแหน่งพิมพ์สติกเกอร์จริง (mm)"
           printerName={selectedPrinter?.name}
-        >
-          <StickerLabelPreview config={config} />
-        </PrintPositionMap>
+          renderContent={({ contentWidthMm, safeHeightMm, pxPerMm }) =>
+            printLayoutMode === 'grid' ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: `${gridGapMm * pxPerMm}px`,
+                }}
+              >
+                {Array.from(
+                  { length: Math.min(copies, gridFitStats.perPage) },
+                  (_, itemIdx) => (
+                    <div
+                      key={itemIdx}
+                      style={{
+                        width: `${stickerBoxWidthMm * pxPerMm}px`,
+                      }}
+                    >
+                      <StickerLabelPreview
+                        config={config}
+                        widthMm={stickerBoxWidthMm}
+                        heightMm={stickerBoxHeightMm}
+                        pxPerMm={pxPerMm}
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <StickerLabelPreview
+                config={config}
+                widthMm={contentWidthMm}
+                heightMm={calibration.paperHeightMm === null ? null : safeHeightMm}
+                pxPerMm={pxPerMm}
+              />
+            )
+          }
+        />
       </div>
 
       {/* Print-Only Calibrated Batch Stickers Container */}
@@ -796,10 +941,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                           key={itemIdx}
                           style={{
                             width: `${stickerBoxWidthMm}mm`,
-                            fontSize: `${Math.max(8, stickerBoxWidthMm * 0.24)}px`,
                           }}
                         >
-                          <StickerLabelPreview config={config} />
+                          <StickerLabelPreview
+                            config={config}
+                            widthMm={stickerBoxWidthMm}
+                            heightMm={stickerBoxHeightMm}
+                          />
                         </div>
                       ))}
                     </div>
@@ -820,6 +968,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                     : isLandscape
                     ? calibration.paperWidthMm
                     : calibration.paperHeightMm;
+                const safeContentW =
+                  Math.max(5, pageW - calibration.marginLeftMm - calibration.marginRightMm) *
+                  (calibration.contentWidthPct / 100);
+                const safeContentH =
+                  pageH !== null
+                    ? Math.max(5, pageH - calibration.marginTopMm - calibration.marginBottomMm)
+                    : null;
                 return (
                   <div
                     key={idx}
@@ -840,10 +995,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                         width: `${calibration.contentWidthPct}%`,
                         transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
                         transformOrigin: 'top left',
-                        fontSize: `${Math.max(8, pageW * (calibration.contentWidthPct / 100) * 0.22)}px`,
                       }}
                     >
-                      <StickerLabelPreview config={config} />
+                      <StickerLabelPreview
+                        config={config}
+                        widthMm={safeContentW}
+                        heightMm={safeContentH}
+                      />
                     </div>
                   </div>
                 );

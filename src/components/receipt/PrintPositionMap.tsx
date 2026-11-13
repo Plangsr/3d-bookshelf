@@ -3,6 +3,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { AlignCenter, BookmarkPlus, Move, RotateCcw } from 'lucide-react';
 import type { PrintLayoutCalibration, ReceiptPaperSize } from '@/types/shirt';
+import { FreeNumberInput } from './FreeNumberInput';
+
+interface PrintPositionMapRenderContext {
+  contentWidthMm: number;
+  safeHeightMm: number;
+  pxPerMm: number;
+}
 
 interface PrintPositionMapProps {
   paperSizes: ReceiptPaperSize[];
@@ -13,7 +20,8 @@ interface PrintPositionMapProps {
   onSaveAsNewPreset?: (preset: ReceiptPaperSize, calibration: PrintLayoutCalibration) => void;
   title?: string;
   printerName?: string;
-  children: React.ReactNode;
+  renderContent?: (ctx: PrintPositionMapRenderContext) => React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const PREVIEW_PAPER_MAX_WIDTH_PX = 310;
@@ -28,6 +36,7 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
   onSaveAsNewPreset,
   title = 'Print Position Map & ไม้บรรทัดระยะขอบจริง (mm)',
   printerName,
+  renderContent,
   children,
 }) => {
   const [presetName, setPresetName] = useState('');
@@ -51,32 +60,32 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
   const isLandscape =
     calibration.orientation === 'landscape' && calibration.paperHeightMm !== null;
   const effWidthMm = Math.max(
-    20,
+    5,
     isLandscape && calibration.paperHeightMm
       ? calibration.paperHeightMm
       : calibration.paperWidthMm
   );
   const effHeightMm =
     calibration.paperHeightMm === null
-      ? Math.max(120, Math.round(effWidthMm * 1.65))
-      : Math.max(20, isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm);
+      ? Math.max(80, Math.round(effWidthMm * 1.65))
+      : Math.max(5, isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm);
 
   // Convert mm -> screen px so paper sheet fits neatly with exact physical aspect ratio
   const pxPerMm = useMemo(() => {
     const scaleX = PREVIEW_PAPER_MAX_WIDTH_PX / effWidthMm;
     const scaleY = PREVIEW_PAPER_MAX_HEIGHT_PX / effHeightMm;
-    return Math.min(scaleX, scaleY, 4.2);
+    return Math.min(scaleX, scaleY, 8.5);
   }, [effWidthMm, effHeightMm]);
 
   const sheetPxW = effWidthMm * pxPerMm;
   const sheetPxH = effHeightMm * pxPerMm;
 
   const safeW = Math.max(
-    5,
+    2,
     effWidthMm - calibration.marginLeftMm - calibration.marginRightMm
   );
   const safeH = Math.max(
-    5,
+    2,
     effHeightMm - calibration.marginTopMm - calibration.marginBottomMm
   );
 
@@ -85,18 +94,21 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
   const actualStartYmm = +(calibration.marginTopMm + calibration.offsetYMm).toFixed(1);
   const remainRightMm = +(effWidthMm - actualStartXmm - contentWmm).toFixed(1);
 
-  // Ruler ticks every 10mm (numbers every 20mm or 50mm depending on paper width)
-  const tickStep = effWidthMm > 140 ? 20 : 10;
+  // Ruler ticks (5mm intervals for small labels <= 60mm, otherwise 10mm intervals)
+  const xTickStep = effWidthMm <= 60 ? 5 : 10;
+  const xLabelStep = effWidthMm > 140 ? 20 : 10;
+  const yTickStep = effHeightMm <= 60 ? 5 : 10;
+  const yLabelStep = effHeightMm > 140 ? 20 : 10;
   const xTicks = useMemo(() => {
     const list: number[] = [];
-    for (let m = 0; m <= effWidthMm; m += 10) list.push(m);
+    for (let m = 0; m <= effWidthMm; m += xTickStep) list.push(m);
     return list;
-  }, [effWidthMm]);
+  }, [effWidthMm, xTickStep]);
   const yTicks = useMemo(() => {
     const list: number[] = [];
-    for (let m = 0; m <= effHeightMm; m += 10) list.push(m);
+    for (let m = 0; m <= effHeightMm; m += yTickStep) list.push(m);
     return list;
-  }, [effHeightMm]);
+  }, [effHeightMm, yTickStep]);
 
   const handlePointerDownMove = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -142,7 +154,7 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
     } else if (dragMode === 'resize') {
       const deltaPct = (dxMm / safeW) * 100;
       const nextPct = Math.round(
-        Math.max(20, Math.min(180, dragStartRef.current.origWidthPct + deltaPct))
+        Math.max(10, Math.min(200, dragStartRef.current.origWidthPct + deltaPct))
       );
       onChangeCalibration({
         ...calibration,
@@ -238,9 +250,9 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
                 style={{ left: `${mm * pxPerMm}px` }}
                 className="absolute bottom-0 flex flex-col items-center -translate-x-1/2"
               >
-                {mm % tickStep === 0 && <span className="leading-none mb-0.5">{mm}</span>}
+                {mm % xLabelStep === 0 && <span className="leading-none mb-0.5">{mm}</span>}
                 <div
-                  className={`w-px bg-[#7a6049] ${mm % tickStep === 0 ? 'h-2' : 'h-1'}`}
+                  className={`w-px bg-[#7a6049] ${mm % xLabelStep === 0 ? 'h-2' : 'h-1'}`}
                 />
               </div>
             ))}
@@ -257,9 +269,9 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
                 style={{ top: `${mm * pxPerMm}px` }}
                 className="absolute right-0 flex items-center -translate-y-1/2"
               >
-                {mm % tickStep === 0 && <span className="leading-none mr-0.5">{mm}</span>}
+                {mm % yLabelStep === 0 && <span className="leading-none mr-0.5">{mm}</span>}
                 <div
-                  className={`h-px bg-[#7a6049] ${mm % tickStep === 0 ? 'w-2' : 'w-1'}`}
+                  className={`h-px bg-[#7a6049] ${mm % yLabelStep === 0 ? 'w-2' : 'w-1'}`}
                 />
               </div>
             ))}
@@ -321,10 +333,20 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
               </div>
 
               <div
-                style={{ fontSize: `${Math.max(5, 3.3 * pxPerMm)}px` }}
+                style={
+                  renderContent
+                    ? undefined
+                    : { fontSize: `${Math.max(4, Math.min(contentWmm, safeH * 0.72) * 0.068 * pxPerMm)}px` }
+                }
                 className="w-full overflow-hidden pointer-events-none"
               >
-                {children}
+                {renderContent
+                  ? renderContent({
+                      contentWidthMm: contentWmm,
+                      safeHeightMm: safeH,
+                      pxPerMm,
+                    })
+                  : children}
               </div>
 
               {/* Bottom-Right Resize Handle */}
@@ -381,17 +403,19 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
             <label className="block text-[10px] text-[#a99784] mb-0.5">
               กว้าง (mm)
             </label>
-            <input
-              type="number"
-              min={20}
+            <FreeNumberInput
+              min={5}
               max={400}
+              allowDecimal
+              step={1}
               value={calibration.paperWidthMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  paperWidthMm: Math.max(20, Math.min(400, Number(e.target.value) || 80)),
+                  paperWidthMm: nextVal,
                 })
               }
+              aria-label="ความกว้างกระดาษ mm"
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
@@ -406,26 +430,28 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
                   onChange={(e) =>
                     onChangeCalibration({
                       ...calibration,
-                      paperHeightMm: e.target.checked ? null : 150,
+                      paperHeightMm: e.target.checked ? null : 40,
                     })
                   }
                 />
                 <span>Roll</span>
               </label>
             </div>
-            <input
-              type="number"
-              min={20}
+            <FreeNumberInput
+              min={5}
               max={600}
+              allowDecimal
+              step={1}
               disabled={calibration.paperHeightMm === null}
-              value={calibration.paperHeightMm ?? ''}
+              value={calibration.paperHeightMm}
               placeholder="Auto"
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  paperHeightMm: Math.max(20, Math.min(600, Number(e.target.value) || 150)),
+                  paperHeightMm: nextVal,
                 })
               }
+              aria-label="ความสูงกระดาษ mm"
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#120d0a] border border-[#443326] disabled:opacity-45 font-mono text-xs text-[#faf5ee]"
             />
           </div>
@@ -435,69 +461,73 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
         <div className="grid grid-cols-4 gap-2">
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">ขอบบน (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
               min={0}
               max={80}
+              allowDecimal
               step={0.5}
               value={calibration.marginTopMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  marginTopMm: Math.max(0, Number(e.target.value) || 0),
+                  marginTopMm: nextVal,
                 })
               }
+              aria-label="ขอบบน mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">ขอบขวา (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
               min={0}
               max={80}
+              allowDecimal
               step={0.5}
               value={calibration.marginRightMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  marginRightMm: Math.max(0, Number(e.target.value) || 0),
+                  marginRightMm: nextVal,
                 })
               }
+              aria-label="ขอบขวา mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">ขอบล่าง (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
               min={0}
               max={80}
+              allowDecimal
               step={0.5}
               value={calibration.marginBottomMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  marginBottomMm: Math.max(0, Number(e.target.value) || 0),
+                  marginBottomMm: nextVal,
                 })
               }
+              aria-label="ขอบล่าง mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">ขอบซ้าย (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
               min={0}
               max={80}
+              allowDecimal
               step={0.5}
               value={calibration.marginLeftMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  marginLeftMm: Math.max(0, Number(e.target.value) || 0),
+                  marginLeftMm: nextVal,
                 })
               }
+              aria-label="ขอบซ้าย mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
@@ -507,48 +537,54 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 items-end">
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">เลื่อน X (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
+              min={-60}
+              max={200}
+              allowDecimal
               step={0.5}
               value={calibration.offsetXMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  offsetXMm: Number(e.target.value) || 0,
+                  offsetXMm: nextVal,
                 })
               }
+              aria-label="เลื่อน X mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">เลื่อน Y (mm)</label>
-            <input
-              type="number"
+            <FreeNumberInput
+              min={-60}
+              max={250}
+              allowDecimal
               step={0.5}
               value={calibration.offsetYMm}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  offsetYMm: Number(e.target.value) || 0,
+                  offsetYMm: nextVal,
                 })
               }
+              aria-label="เลื่อน Y mm"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
           <div>
             <label className="block text-[10px] text-[#a99784] mb-0.5">ขนาดพิมพ์ (%)</label>
-            <input
-              type="number"
-              min={20}
-              max={180}
+            <FreeNumberInput
+              min={10}
+              max={200}
               step={5}
               value={calibration.contentWidthPct}
-              onChange={(e) =>
+              onChangeNumber={(nextVal) =>
                 onChangeCalibration({
                   ...calibration,
-                  contentWidthPct: Math.max(20, Math.min(180, Number(e.target.value) || 100)),
+                  contentWidthPct: nextVal,
                 })
               }
+              aria-label="ขนาดพิมพ์ เปอร์เซ็นต์"
               className="w-full px-2 py-1 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
             />
           </div>
