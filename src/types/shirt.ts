@@ -94,6 +94,8 @@ export interface StickerConfig {
   showCutBorder: boolean;
   /** Optional multiplier (%) on top of automatic sticker-size text scaling (default 100) */
   fontScalePct?: number;
+  /** Text alignment across sticker fields: 'left' | 'center' | 'right' */
+  textAlign?: 'left' | 'center' | 'right';
   /** Detail spacing mode: 'auto' shrinks padding/gaps when sticker <= 36x46mm */
   detailDensity?: 'auto' | 'compact' | 'normal';
 }

@@ -2,6 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   BookmarkPlus,
   Eraser,
   FolderPlus,
@@ -103,6 +106,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     borderRadiusMm: 2,
     showCutBorder: true,
     fontScalePct: 100,
+    textAlign: 'left',
     detailDensity: 'auto',
   }));
 
@@ -628,24 +632,77 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             )}
           </div>
 
-          {/* Text Scaling Slider */}
-          <div className="pt-3 border-t border-[#3a2a1f] flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs sm:text-sm xl:text-base font-semibold text-[#d6c8b6]">
-              ขยายขนาดตัวอักษรบนสติกเกอร์
+          {/* Text Alignment & Text Scaling Controls */}
+          <div className="pt-3 border-t border-[#3a2a1f] space-y-3">
+            {/* จัดเรียงข้อความ: ชิดซ้าย / กึ่งกลาง / ชิดขวา */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm xl:text-base font-semibold text-[#d6c8b6]">
+                จัดตำแหน่งข้อความ
+              </div>
+              <div className="flex items-center gap-1.5 bg-[#120d0a] p-1 rounded-xl border border-[#3b2c21]">
+                <button
+                  type="button"
+                  onClick={() => patchConfig({ textAlign: 'left' })}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all ${
+                    (config.textAlign ?? 'left') === 'left'
+                      ? 'bg-[#e8c170] text-[#1c1410] font-bold shadow-sm'
+                      : 'text-[#c8b7a4] hover:text-white'
+                  }`}
+                >
+                  <AlignLeft className="w-4 h-4" />
+                  <span>ชิดซ้าย</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchConfig({ textAlign: 'center' })}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all ${
+                    config.textAlign === 'center'
+                      ? 'bg-[#e8c170] text-[#1c1410] font-bold shadow-sm'
+                      : 'text-[#c8b7a4] hover:text-white'
+                  }`}
+                >
+                  <AlignCenter className="w-4 h-4" />
+                  <span>กึ่งกลาง</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchConfig({ textAlign: 'right' })}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all ${
+                    config.textAlign === 'right'
+                      ? 'bg-[#e8c170] text-[#1c1410] font-bold shadow-sm'
+                      : 'text-[#c8b7a4] hover:text-white'
+                  }`}
+                >
+                  <AlignRight className="w-4 h-4" />
+                  <span>ชิดขวา</span>
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <input
-                type="range"
-                min={60}
-                max={150}
-                step={5}
-                value={config.fontScalePct ?? 100}
-                onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
-                className="w-36 sm:w-52 accent-[#e8c170]"
-              />
-              <span className="font-mono text-xs sm:text-sm xl:text-base font-bold text-[#e8c170] w-12 sm:w-16 text-right">
-                {config.fontScalePct ?? 100}%
-              </span>
+
+            {/* ขยายขนาดตัวอักษร: ปรับได้ตั้งแต่ 60% ถึง 250% */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs sm:text-sm xl:text-base font-semibold text-[#d6c8b6]">
+                  ขยายขนาดตัวอักษรบนสติกเกอร์
+                </div>
+                <div className="text-[11px] sm:text-xs text-[#8e7a68]">
+                  ปรับขนาดตัวหนังสือให้ใหญ่เต็มแผ่นตามต้องการ (สูงสุด 250%)
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <input
+                  type="range"
+                  min={60}
+                  max={250}
+                  step={5}
+                  value={config.fontScalePct ?? 100}
+                  onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
+                  className="w-36 sm:w-56 accent-[#e8c170]"
+                />
+                <span className="font-mono text-xs sm:text-sm xl:text-base font-bold text-[#e8c170] w-14 sm:w-16 text-right">
+                  {config.fontScalePct ?? 100}%
+                </span>
+              </div>
             </div>
           </div>
         </div>

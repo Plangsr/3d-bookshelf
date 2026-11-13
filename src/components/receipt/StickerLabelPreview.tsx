@@ -102,12 +102,12 @@ function computeStickerMetrics(
     if (config.barcodeCaption.trim()) emDemand += captionChars > 24 ? 1.1 : 0.65;
   }
 
-  const widthBudgetMm = effW * (isCompact ? 0.056 : 0.058);
-  const heightBudgetMm = (effH * 0.93) / Math.max(6, emDemand);
-  const userScale = Math.max(0.45, Math.min(1.6, (config.fontScalePct ?? 100) / 100));
+  const widthBudgetMm = effW * (isCompact ? 0.068 : 0.075);
+  const heightBudgetMm = (effH * 0.95) / Math.max(5, emDemand);
+  const userScale = Math.max(0.45, Math.min(2.5, (config.fontScalePct ?? 100) / 100));
 
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(0.55, Math.min(6.5, rawFontMm));
+  const baseFontMm = Math.max(0.7, Math.min(9.0, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
@@ -157,6 +157,10 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
   const padClass = metrics.isCompact ? 'p-[0.38em]' : 'p-[0.75em]';
   const fieldGapClass = metrics.isCompact ? 'space-y-[0.22em]' : 'space-y-[0.55em]';
 
+  const align = config.textAlign ?? 'left';
+  const textAlignClass =
+    align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+
   return (
     <div
       style={{
@@ -196,10 +200,10 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
       {/* Main Fields: รุ่น / สี / ไซส์ */}
       <div className={fieldGapClass}>
         {/* รุ่น (MODEL) */}
-        <div>
+        <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.58em]' : 'text-[0.65em]'
+              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
             } font-medium text-neutral-600`}
           >
             รุ่น (MODEL):
@@ -207,7 +211,7 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
           {config.modelName.trim() ? (
             <div
               className={`${
-                metrics.isCompact ? 'text-[0.95em]' : 'text-[1.08em]'
+                metrics.isCompact ? 'text-[1.05em]' : 'text-[1.20em]'
               } font-extrabold tracking-tight text-black mt-[0.08em] break-words`}
             >
               {config.modelName.trim()}
@@ -222,10 +226,10 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         </div>
 
         {/* สี (COLOR) */}
-        <div>
+        <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.58em]' : 'text-[0.65em]'
+              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
             } font-medium text-neutral-600`}
           >
             สี (COLOR):
@@ -233,7 +237,7 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
           {config.colorName.trim() ? (
             <div
               className={`${
-                metrics.isCompact ? 'text-[0.88em]' : 'text-[0.98em]'
+                metrics.isCompact ? 'text-[0.98em]' : 'text-[1.10em]'
               } font-bold text-[#1d222b] mt-[0.08em] break-words`}
             >
               {config.colorName.trim()}
@@ -248,18 +252,18 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         </div>
 
         {/* ไซส์ (SIZE) */}
-        <div>
+        <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.58em]' : 'text-[0.65em]'
+              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
             } font-medium text-neutral-600`}
           >
             ไซส์ (SIZE):
           </div>
           {config.sizeLabel.trim() ? (
             <div
-              className={`text-center ${
-                metrics.isCompact ? 'text-[1.72em]' : 'text-[2.2em]'
+              className={`${textAlignClass} ${
+                metrics.isCompact ? 'text-[1.95em]' : 'text-[2.5em]'
               } font-black text-black tracking-tight leading-none py-[0.08em]`}
             >
               {config.sizeLabel.trim()}
