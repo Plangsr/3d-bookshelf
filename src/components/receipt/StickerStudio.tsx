@@ -45,10 +45,11 @@ interface StickerStudioProps {
 }
 
 const STICKER_QUICK_SIZES: { label: string; w: number; h: number; m: number }[] = [
-  { label: 'สติกเกอร์เล็ก 30×40mm', w: 30, h: 40, m: 1.5 },
-  { label: 'สติกเกอร์ 40×60mm', w: 40, h: 60, m: 2 },
-  { label: 'สติกเกอร์เสื้อ 50×70mm', w: 50, h: 70, m: 2 },
-  { label: 'สติกเกอร์กลาง 58×80mm', w: 58, h: 80, m: 2 },
+  { label: 'สติกเกอร์ 30×40mm (XP-490B)', w: 30, h: 40, m: 1.5 },
+  { label: 'สติกเกอร์ 40×60mm (XP-490B)', w: 40, h: 60, m: 2 },
+  { label: 'สติกเกอร์ 50×70mm (XP-490B)', w: 50, h: 70, m: 2 },
+  { label: 'สติกเกอร์ 70×100mm (XP-490B)', w: 70, h: 100, m: 2 },
+  { label: 'สติกเกอร์ 100×150mm (XP-490B)', w: 100, h: 150, m: 2.5 },
   { label: 'A4 แผ่นรวม (210×297mm)', w: 210, h: 297, m: 8 },
 ];
 
@@ -679,21 +680,21 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               </div>
             </div>
 
-            {/* ขยายขนาดตัวอักษร: ปรับได้ตั้งแต่ 60% ถึง 250% */}
+            {/* ขยายขนาดตัวอักษร: ปรับได้ตั้งแต่ 60% ถึง 350% (รองรับเครื่องพิมพ์สติกเกอร์ Xprinter XP-490B) */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs sm:text-sm xl:text-base font-semibold text-[#d6c8b6]">
-                  ขยายขนาดตัวอักษรบนสติกเกอร์
+                  ขยายขนาดตัวอักษรบนสติกเกอร์ (Xprinter XP-490B)
                 </div>
                 <div className="text-[11px] sm:text-xs text-[#8e7a68]">
-                  ปรับขนาดตัวหนังสือให้ใหญ่เต็มแผ่นตามต้องการ (สูงสุด 250%)
+                  ปรับขนาดตัวหนังสือให้ใหญ่เต็มพื้นที่พิมพ์จริง (สูงสุด 350%)
                 </div>
               </div>
               <div className="flex items-center gap-2.5">
                 <input
                   type="range"
                   min={60}
-                  max={250}
+                  max={350}
                   step={5}
                   value={config.fontScalePct ?? 100}
                   onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}

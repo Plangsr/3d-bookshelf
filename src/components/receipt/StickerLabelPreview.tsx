@@ -102,12 +102,14 @@ function computeStickerMetrics(
     if (config.barcodeCaption.trim()) emDemand += captionChars > 24 ? 1.1 : 0.65;
   }
 
-  const widthBudgetMm = effW * (isCompact ? 0.068 : 0.075);
-  const heightBudgetMm = (effH * 0.95) / Math.max(5, emDemand);
-  const userScale = Math.max(0.45, Math.min(2.5, (config.fontScalePct ?? 100) / 100));
+  // For label printers like Xprinter XP-490B (203 DPI, 26mm - 108mm print width),
+  // font scale can go up to 350% to fill the physical label cleanly without overflowing
+  const widthBudgetMm = effW * (isCompact ? 0.082 : 0.092);
+  const heightBudgetMm = (effH * 0.96) / Math.max(4.2, emDemand);
+  const userScale = Math.max(0.45, Math.min(3.5, (config.fontScalePct ?? 100) / 100));
 
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(0.7, Math.min(9.0, rawFontMm));
+  const baseFontMm = Math.max(0.8, Math.min(14.0, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
