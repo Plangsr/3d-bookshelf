@@ -53,8 +53,9 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error handling vercel discord webhook:', error);
-    return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+    return NextResponse.json({ ok: false, error: errorMessage }, { status: 500 });
   }
 }
