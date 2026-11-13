@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
+  ExternalLink,
   FileImage,
   FolderPlus,
   Layers,
@@ -103,6 +104,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
     () => shirts.find((s) => s.id === quickShirtId) ?? shirts[0],
     [shirts, quickShirtId]
   );
+  const [quickColor, setQuickColor] = useState<string>(selectedQuickShirt?.color ?? '#1a2332');
   const [quickSizeLabel, setQuickSizeLabel] = useState<string>(
     selectedQuickShirt?.sizes[0]?.label ?? 'M'
   );
@@ -167,7 +169,10 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
     if (!sizeObj) return;
 
     const existingIdx = draft.items.findIndex(
-      (i) => i.shirtId === selectedQuickShirt.id && i.sizeLabel === sizeObj.label
+      (i) =>
+        i.shirtId === selectedQuickShirt.id &&
+        i.sizeLabel === sizeObj.label &&
+        i.shirtColor === quickColor
     );
     const nextItems = [...draft.items];
     if (existingIdx >= 0) {
@@ -181,11 +186,11 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
         shirtId: selectedQuickShirt.id,
         sku: selectedQuickShirt.sku,
         shirtName: selectedQuickShirt.name,
-        shirtColor: selectedQuickShirt.color,
+        shirtColor: quickColor || selectedQuickShirt.color,
         shirtStyle: selectedQuickShirt.style,
         sizeId: sizeObj.id,
         sizeLabel: sizeObj.label,
-        sizeMeasureText: `อก ${sizeObj.chestInch}" ยาว ${sizeObj.lengthInch}"`,
+        sizeMeasureText: `สี ${quickColor || selectedQuickShirt.color} • อก ${sizeObj.chestInch}" ยาว ${sizeObj.lengthInch}"`,
         unitPrice: sizeObj.price,
         quantity: Math.max(1, quickQty),
       });
@@ -321,6 +326,15 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://docs.google.com/spreadsheets/d/1i_tTqQkL7kd279Nc04-L_l7atRodk_145kFPMejfh3U/edit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#18291e] hover:bg-[#213829] border border-[#2f523a] text-xs font-semibold text-[#86efac]"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>ดูตารางข้อมูล Google Sheet</span>
+            </a>
             <button
               type="button"
               onClick={onOpenSizeManager}
@@ -666,7 +680,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                 })}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-[11px] text-[#d6c8b6] mb-1">
                     ขนาดกระดาษ (Preset)
@@ -683,53 +697,47 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] text-[#d6c8b6] mb-1">
-                    วิธีชำระเงิน
-                  </label>
-                  <select
-                    value={draft.paymentMethod}
-                    onChange={(e) =>
-                      patchDraft({ paymentMethod: e.target.value as PaymentMethod })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-                  >
-                    {PAYMENT_OPTIONS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
-              {/* Quick Add Shirt Item */}
-              <div className="flex flex-wrap items-end gap-2 pt-1 border-t border-[#2d2118]">
+              {/* Quick Add Shirt Item: รุ่น / สี / Size เท่านั้น */}
+              <div className="flex flex-wrap items-end gap-2 pt-2 border-t border-[#2d2118]">
                 <div className="flex-1 min-w-[160px]">
                   <label className="block text-[11px] text-[#d6c8b6] mb-1">
-                    เพิ่มสินค้าลงใบเสร็จ
+                    รุ่น (Model)
                   </label>
                   <select
                     value={selectedQuickShirt?.id ?? ''}
                     onChange={(e) => {
                       const nextShirt = shirts.find((s) => s.id === e.target.value);
                       setQuickShirtId(e.target.value);
-                      if (nextShirt?.sizes[0]) {
-                        setQuickSizeLabel(nextShirt.sizes[0].label);
+                      if (nextShirt) {
+                        setQuickColor(nextShirt.color);
+                        if (nextShirt.sizes[0]) {
+                          setQuickSizeLabel(nextShirt.sizes[0].label);
+                        }
                       }
                     }}
                     className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
                   >
                     {shirts.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.sku} — {s.name}
+                        {s.name}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="w-24">
-                  <label className="block text-[11px] text-[#d6c8b6] mb-1">ไซส์</label>
+                <div className="w-28">
+                  <label className="block text-[11px] text-[#d6c8b6] mb-1">สี (Color)</label>
+                  <input
+                    type="text"
+                    value={quickColor}
+                    onChange={(e) => setQuickColor(e.target.value)}
+                    placeholder="เช่น ดำ / ขาว"
+                    className="w-full px-2.5 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="block text-[11px] text-[#d6c8b6] mb-1">Size</label>
                   <select
                     value={quickSizeLabel}
                     onChange={(e) => setQuickSizeLabel(e.target.value)}
@@ -737,25 +745,18 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                   >
                     {(selectedQuickShirt?.sizes ?? []).map((sz) => (
                       <option key={sz.id} value={sz.label}>
-                        {sz.label} ({formatTHB(sz.price)})
+                        {sz.label}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="w-20">
-                  <label className="block text-[11px] text-[#d6c8b6] mb-1">จำนวน</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={quickQty}
-                    onChange={(e) => setQuickQty(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full px-2.5 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs font-mono text-[#faf5ee]"
-                  />
-                </div>
                 <button
                   type="button"
-                  onClick={handleQuickAddShirt}
-                  className="px-3.5 py-2 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170] flex items-center gap-1"
+                  onClick={() => {
+                    setQuickQty(1);
+                    handleQuickAddShirt();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-xs font-bold flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>เพิ่ม</span>
@@ -796,40 +797,6 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                 </div>
               )}
 
-              {/* Customer & Totals */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <input
-                  type="text"
-                  value={draft.customerName}
-                  onChange={(e) => patchDraft({ customerName: e.target.value })}
-                  placeholder="ชื่อลูกค้า"
-                  className="px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-                />
-                <input
-                  type="text"
-                  value={draft.customerPhone}
-                  onChange={(e) => patchDraft({ customerPhone: e.target.value })}
-                  placeholder="เบอร์โทร"
-                  className="px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-                />
-                <select
-                  value={draft.vatMode}
-                  onChange={(e) => patchDraft({ vatMode: e.target.value as VatMode })}
-                  className="px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-                >
-                  <option value="none">ไม่คิด VAT</option>
-                  <option value="included_7">รวม VAT 7%</option>
-                  <option value="excluded_7">แยก VAT +7%</option>
-                </select>
-              </div>
-
-              <textarea
-                rows={2}
-                value={draft.notes}
-                onChange={(e) => patchDraft({ notes: e.target.value })}
-                placeholder="หมายเหตุท้ายใบเสร็จ..."
-                className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-              />
             </div>
 
             {/* 4. Batch Print Control (1 - 1,000+ copies) */}
