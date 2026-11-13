@@ -209,6 +209,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
       vatMode: draft.vatMode,
       hidePricesOnSlip: draft.hidePricesOnSlip,
       includeSlipOnPrint: draft.includeSlipOnPrint,
+      useCustomShopTemplate: draft.useCustomShopTemplate,
       notes: draft.notes,
       defaultCopies: Math.max(1, copies),
       updatedAt: new Date().toISOString(),
@@ -242,6 +243,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             vatMode: draft.vatMode,
             hidePricesOnSlip: draft.hidePricesOnSlip,
             includeSlipOnPrint: draft.includeSlipOnPrint,
+            useCustomShopTemplate: draft.useCustomShopTemplate,
             notes: draft.notes,
             defaultCopies: Math.max(1, copies),
             updatedAt: new Date().toISOString(),
@@ -273,6 +275,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
       vatMode: setItem.vatMode,
       hidePricesOnSlip: setItem.hidePricesOnSlip,
       includeSlipOnPrint: setItem.includeSlipOnPrint,
+      useCustomShopTemplate: setItem.useCustomShopTemplate,
       notes: setItem.notes,
       shop: shopProfile,
     });
@@ -515,6 +518,95 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             <div className="rounded-2xl border border-[#3a2a1f] bg-[#1a130e] p-4 space-y-3.5">
               <div className="text-sm font-bold text-[#f7f1e8]">
                 3. เลือกแบบใบเสร็จ ขนาดกระดาษ และกรอกรายการ
+              </div>
+
+              {/* Custom Shop Receipt Template Upload (100% Local) */}
+              <div className="rounded-xl border border-[#3b2c21] bg-[#120d0a] p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold text-[#f5efe6]">
+                      อัปโหลดรูปแบบใบเสร็จของร้าน (Custom Shop Format)
+                    </div>
+                    <div className="text-[11px] text-[#a99784]">
+                      อัปโหลดไฟล์รูปแบบใบเสร็จของร้าน เพื่อพิมพ์ตามขนาด Preset ที่เลือกโดยตรง
+                    </div>
+                  </div>
+                  <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170]">
+                    <span>
+                      {draft.customShopTemplateDataUrl ? 'เปลี่ยนรูปแบบร้าน' : 'อัปโหลดรูปแบบร้าน'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') {
+                            patchDraft({
+                              customShopTemplateDataUrl: reader.result,
+                              customShopTemplateName: file.name,
+                              useCustomShopTemplate: true,
+                            });
+                            setStatusText(
+                              `อัปโหลดรูปแบบใบเสร็จร้าน "${file.name}" แล้ว — พร้อมพิมพ์ตามขนาด Preset`
+                            );
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {draft.customShopTemplateDataUrl && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#2b2018]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={draft.customShopTemplateDataUrl}
+                      alt={draft.customShopTemplateName || 'Shop Template'}
+                      className="w-12 h-14 object-cover rounded border border-[#4a3829] bg-white"
+                    />
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-xs text-[#f5efe6] truncate">
+                        {draft.customShopTemplateName || 'รูปแบบใบเสร็จของร้าน'}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchDraft({ useCustomShopTemplate: !draft.useCustomShopTemplate })
+                          }
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] ${
+                            draft.useCustomShopTemplate
+                              ? 'bg-[#e8c170]/15 border-[#e8c170] text-[#f5da98]'
+                              : 'bg-[#1a130e] border-[#3b2c21] text-[#a79582]'
+                          }`}
+                        >
+                          {draft.useCustomShopTemplate
+                            ? '✓ กำลังใช้รูปแบบร้านนี้ในการพิมพ์'
+                            : 'ใช้รูปแบบมาตรฐานของระบบ'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchDraft({
+                              customShopTemplateDataUrl: undefined,
+                              customShopTemplateName: undefined,
+                              useCustomShopTemplate: false,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg border border-red-900/50 bg-red-950/30 text-red-300 text-[11px]"
+                        >
+                          ลบรูปแบบร้าน
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

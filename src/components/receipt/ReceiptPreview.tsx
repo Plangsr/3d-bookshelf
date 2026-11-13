@@ -111,10 +111,26 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       style={paperStyle}
       className="bg-white text-[#171412] shadow-2xl border border-neutral-200 flex flex-col justify-between leading-snug break-words print:!w-full print:!min-h-0 print:!p-0 print:!shadow-none print:!border-0 print:![zoom:1]"
     >
-      {/* ============================================================
+      {draft.useCustomShopTemplate && draft.customShopTemplateDataUrl ? (
+        <div className="flex flex-col items-center justify-start w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={draft.customShopTemplateDataUrl}
+            alt={draft.customShopTemplateName || 'Custom Shop Receipt'}
+            className="w-full h-auto object-contain"
+          />
+          {draft.receiptNo && (
+            <div className="mt-[0.4em] text-[0.7em] font-mono text-neutral-500 text-center">
+              Ref: {draft.receiptNo}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* ============================================================
           TEMPLATE 1: THERMAL POS SLIP
           ============================================================ */}
-      {template === 'thermal_pos' && (
+          {template === 'thermal_pos' && (
         <div className="flex flex-col flex-1 justify-between font-mono text-[0.92em]">
           <div>
             {/* Shop Header */}
@@ -856,6 +872,8 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             )}
           </div>
         </div>
+      )}
+        </>
       )}
 
       {draft.slipImageDataUrl && draft.includeSlipOnPrint !== false && (

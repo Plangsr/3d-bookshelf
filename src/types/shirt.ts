@@ -109,6 +109,9 @@ export interface ReceiptRecord {
   slipImageDataUrl?: string;
   slipFileName?: string;
   includeSlipOnPrint?: boolean;
+  customShopTemplateDataUrl?: string;
+  customShopTemplateName?: string;
+  useCustomShopTemplate?: boolean;
   notes: string;
   subtotal: number;
   vatAmount: number;
@@ -136,6 +139,7 @@ export interface PrintSet {
   vatMode: VatMode;
   hidePricesOnSlip?: boolean;
   includeSlipOnPrint?: boolean;
+  useCustomShopTemplate?: boolean;
   notes: string;
   defaultCopies: number;
   updatedAt: string;
