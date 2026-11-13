@@ -43,12 +43,31 @@ body {
     visibility: hidden !important;
   }
 
-  #printable-receipt-root,
-  #printable-receipt-root * {
+  /* When printing batch / stickers / quick upload, only show printable-batch-root */
+  body:has(#printable-batch-root) #printable-batch-root,
+  body:has(#printable-batch-root) #printable-batch-root * {
     visibility: visible !important;
   }
 
-  #printable-receipt-root {
+  body:has(#printable-batch-root) #printable-batch-root {
+    position: static !important;
+    display: block !important;
+    background: white !important;
+    width: 100% !important;
+  }
+
+  body:has(#printable-batch-root) #printable-receipt-root {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Fallback: when printing standard single receipt (and NO printable-batch-root exists) */
+  body:not(:has(#printable-batch-root)) #printable-receipt-root,
+  body:not(:has(#printable-batch-root)) #printable-receipt-root * {
+    visibility: visible !important;
+  }
+
+  body:not(:has(#printable-batch-root)) #printable-receipt-root {
     position: fixed !important;
     inset: 0 !important;
     display: flex !important;
@@ -57,18 +76,6 @@ body {
     background: white !important;
     z-index: 99999 !important;
     overflow: visible !important;
-  }
-
-  #printable-batch-root,
-  #printable-batch-root * {
-    visibility: visible !important;
-  }
-
-  #printable-batch-root {
-    position: static !important;
-    display: block !important;
-    background: white !important;
-    width: 100% !important;
   }
 
   .print-page-break {
