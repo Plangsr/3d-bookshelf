@@ -160,6 +160,13 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
   const padClass = metrics.isCompact ? 'p-[0.38em]' : 'p-[0.75em]';
   const fieldGapClass = metrics.isCompact ? 'space-y-[0.22em]' : 'space-y-[0.55em]';
 
+  const modelScale = Math.max(0.5, Math.min(2.5, (config.modelFontScalePct ?? 100) / 100));
+  const colorScale = Math.max(0.5, Math.min(2.5, (config.colorFontScalePct ?? 100) / 100));
+  const sizeScale = Math.max(0.5, Math.min(2.5, (config.sizeFontScalePct ?? 100) / 100));
+  const modelValueEm = (metrics.isCompact ? 1.35 : 1.5) * modelScale;
+  const colorValueEm = (metrics.isCompact ? 1.2 : 1.35) * colorScale;
+  const sizeValueEm = (metrics.isCompact ? 2.2 : 2.6) * sizeScale;
+
   const align = config.textAlign ?? 'left';
   const textAlignClass =
     align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
@@ -225,9 +232,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
             </span>
             {config.modelName.trim() ? (
               <span
-                className={`${
-                  metrics.isCompact ? 'text-[1.35em]' : 'text-[1.50em]'
-                } font-black tracking-tight text-black break-words`}
+                style={{ fontSize: `${modelValueEm.toFixed(3)}em` }}
+                className="font-black tracking-tight text-black break-words leading-none"
               >
                 {config.modelName.trim()}
               </span>
@@ -249,9 +255,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
             </span>
             {config.colorName.trim() ? (
               <span
-                className={`${
-                  metrics.isCompact ? 'text-[1.20em]' : 'text-[1.35em]'
-                } font-black text-black break-words`}
+                style={{ fontSize: `${colorValueEm.toFixed(3)}em` }}
+                className="font-black text-black break-words leading-none"
               >
                 {config.colorName.trim()}
               </span>
@@ -273,9 +278,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
             </span>
             {config.sizeLabel.trim() ? (
               <span
-                className={`${
-                  metrics.isCompact ? 'text-[2.2em]' : 'text-[2.6em]'
-                } font-black text-black tracking-tight leading-none`}
+                style={{ fontSize: `${sizeValueEm.toFixed(3)}em` }}
+                className="font-black text-black tracking-tight leading-none"
               >
                 {config.sizeLabel.trim()}
               </span>

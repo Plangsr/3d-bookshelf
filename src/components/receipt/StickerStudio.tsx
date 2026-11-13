@@ -721,6 +721,94 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* ปรับขนาดข้อความแยกแต่ละช่อง: รุ่น (MODEL) / สี (COLOR) / ไซส์ (SIZE) */}
+            <div className="rounded-xl border border-[#3a2a1f] bg-[#120d0a] p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm font-semibold text-[#e8c170]">
+                  ปรับขนาดข้อความแยกแต่ละช่อง (รุ่น / สี / ไซส์)
+                </span>
+                {((config.modelFontScalePct ?? 100) !== 100 ||
+                  (config.colorFontScalePct ?? 100) !== 100 ||
+                  (config.sizeFontScalePct ?? 100) !== 100) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patchConfig({
+                        modelFontScalePct: 100,
+                        colorFontScalePct: 100,
+                        sizeFontScalePct: 100,
+                      })
+                    }
+                    className="text-[11px] sm:text-xs text-[#cbbba9] hover:text-[#e8c170] underline"
+                  >
+                    รีเซ็ต 100%
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
+                    <span>รุ่น (MODEL)</span>
+                    <span className="font-mono font-bold text-[#e8c170]">
+                      {config.modelFontScalePct ?? 100}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={250}
+                    step={5}
+                    value={config.modelFontScalePct ?? 100}
+                    onChange={(e) =>
+                      patchConfig({ modelFontScalePct: Number(e.target.value) || 100 })
+                    }
+                    className="w-full accent-[#e8c170]"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
+                    <span>สี (COLOR)</span>
+                    <span className="font-mono font-bold text-[#e8c170]">
+                      {config.colorFontScalePct ?? 100}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={250}
+                    step={5}
+                    value={config.colorFontScalePct ?? 100}
+                    onChange={(e) =>
+                      patchConfig({ colorFontScalePct: Number(e.target.value) || 100 })
+                    }
+                    className="w-full accent-[#e8c170]"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
+                    <span>ไซส์ (SIZE)</span>
+                    <span className="font-mono font-bold text-[#e8c170]">
+                      {config.sizeFontScalePct ?? 100}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={250}
+                    step={5}
+                    value={config.sizeFontScalePct ?? 100}
+                    onChange={(e) =>
+                      patchConfig({ sizeFontScalePct: Number(e.target.value) || 100 })
+                    }
+                    className="w-full accent-[#e8c170]"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
