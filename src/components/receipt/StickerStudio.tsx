@@ -301,13 +301,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
         )}
 
-        {/* 1. Sticker Content: รุ่น / สี / ไซส์ + ใส่เองหรือเว้นว่างไว้เขียนภายหลัง */}
-        <div className="rounded-2xl border border-[#3a2a1f] bg-[#1a130e] p-4 space-y-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-[#e8c170]" />
-              <div className="text-sm font-bold text-[#f7f1e8]">
-                1. ข้อมูลบนสติกเกอร์ (รุ่น • สี • ไซส์)
+        {/* 1. Sticker Content: รุ่น / สี / ไซส์ (Clean Large UI) */}
+        <div className="rounded-2xl border border-[#4a3628] bg-[#1a130e] p-5 sm:p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#3a2a1f] pb-3">
+            <div className="flex items-center gap-2.5">
+              <Tag className="w-5 h-5 text-[#e8c170]" />
+              <div className="text-base font-bold text-[#f7f1e8]">
+                ข้อมูลสติกเกอร์ (รุ่น • สี • ไซส์)
               </div>
             </div>
             <button
@@ -321,46 +321,24 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   barcodeCaption: '',
                 })
               }
-              className="px-2.5 py-1.5 rounded-lg bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[11px] font-semibold text-[#e8c170] flex items-center gap-1"
+              className="px-3 py-1.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170] flex items-center gap-1.5 transition-colors"
             >
-              <Eraser className="w-3.5 h-3.5" />
-              <span>เว้นว่างทั้งหมด (ไว้เขียนมือทีหลัง)</span>
+              <Eraser className="w-4 h-4" />
+              <span>เว้นว่างทั้งหมด (ไว้เขียนมือ)</span>
             </button>
           </div>
 
-          {/* Brand Header */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] text-[#d6c8b6]">ชื่อแบรนด์หัวสติกเกอร์</label>
-              <label className="flex items-center gap-1 text-[10px] text-[#e8c170] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.showBrandHeader}
-                  onChange={(e) => patchConfig({ showBrandHeader: e.target.checked })}
-                />
-                <span>แสดงหัวแบรนด์</span>
-              </label>
-            </div>
-            <input
-              type="text"
-              value={config.brandHeader}
-              onChange={(e) => patchConfig({ brandHeader: e.target.value })}
-              placeholder="เช่น THAI APPAREL"
-              className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-            />
-          </div>
-
           {/* รุ่น (Model) */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] text-[#d6c8b6] font-semibold">
-                รุ่น (MODEL) — พิมพ์เอง หรือลบให้ว่างเพื่อขีดเส้นไว้เขียนปากกา
+              <label className="text-sm font-bold text-[#f5efe6]">
+                รุ่น (MODEL)
               </label>
               {config.modelName && (
                 <button
                   type="button"
                   onClick={() => patchConfig({ modelName: '' })}
-                  className="text-[10px] text-[#e8c170] hover:underline"
+                  className="text-xs text-[#e8c170] hover:underline"
                 >
                   เว้นว่างไว้เขียนเอง
                 </button>
@@ -370,22 +348,22 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               type="text"
               value={config.modelName}
               onChange={(e) => patchConfig({ modelName: e.target.value })}
-              placeholder="เว้นว่าง = ขีดเส้นไว้เขียนรุ่นเองภายหลัง เช่น CHIC CASUAL V.1"
-              className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+              placeholder="พิมพ์ชื่อรุ่น เช่น 1103 หรือปล่อยว่างเพื่อขีดเส้นเขียน"
+              className="w-full px-4 py-3 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
             />
           </div>
 
           {/* สี (Color) */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] text-[#d6c8b6] font-semibold">
-                สี (COLOR) — พิมพ์เอง เลือกสี หรือเว้นว่างไว้เขียนเอง
+              <label className="text-sm font-bold text-[#f5efe6]">
+                สี (COLOR)
               </label>
               {config.colorName && (
                 <button
                   type="button"
                   onClick={() => patchConfig({ colorName: '' })}
-                  className="text-[10px] text-[#e8c170] hover:underline"
+                  className="text-xs text-[#e8c170] hover:underline"
                 >
                   เว้นว่างไว้เขียนเอง
                 </button>
@@ -395,19 +373,19 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               type="text"
               value={config.colorName}
               onChange={(e) => patchConfig({ colorName: e.target.value })}
-              placeholder="เว้นว่าง = ขีดเส้นไว้เขียนสีเอง เช่น กรมท่า (NAVY BLUE)"
-              className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+              placeholder="พิมพ์ชื่อสี หรือเลือกปุ่มด้านล่าง"
+              className="w-full px-4 py-3 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
             />
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2 pt-1">
               {QUICK_COLOR_CHIPS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => patchConfig({ colorName: c })}
-                  className={`px-2 py-0.5 rounded-md border text-[10px] ${
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                     config.colorName === c
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
-                      : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21] hover:border-[#6a503b]'
+                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold shadow-md scale-105'
+                      : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
                   }`}
                 >
                   {c}
@@ -417,28 +395,28 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
 
           {/* ไซส์ (Size) */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] text-[#d6c8b6] font-semibold">
-                ไซส์ (SIZE) — เลือก กดพิมพ์ หรือเว้นว่างไว้เขียนเอง
+              <label className="text-sm font-bold text-[#f5efe6]">
+                ไซส์ (SIZE)
               </label>
               <button
                 type="button"
                 onClick={() => patchConfig({ sizeLabel: '' })}
-                className="text-[10px] text-[#e8c170] hover:underline"
+                className="text-xs text-[#e8c170] hover:underline"
               >
                 เว้นว่างไว้เขียนเอง
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               {QUICK_SIZE_CHIPS.map((sz) => (
                 <button
                   key={sz}
                   type="button"
                   onClick={() => patchConfig({ sizeLabel: sz })}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold ${
+                  className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all ${
                     config.sizeLabel === sz
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] scale-105 shadow-md'
                       : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21] hover:border-[#6a503b]'
                   }`}
                 >
@@ -449,111 +427,72 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 type="text"
                 value={config.sizeLabel}
                 onChange={(e) => patchConfig({ sizeLabel: e.target.value })}
-                placeholder="หรือพิมพ์ไซส์เอง"
-                className="w-28 px-2.5 py-1 rounded-lg bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+                placeholder="พิมพ์ไซส์เอง"
+                className="w-32 px-3.5 py-2 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm font-bold text-[#ffffff] placeholder:text-[#786656] text-center"
               />
             </div>
           </div>
 
-          {/* Barcode & Write-In Line Style */}
-          <div className="pt-2 border-t border-[#2d2118] grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-xs text-[#d6c8b6] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.showBarcode}
-                    onChange={(e) => patchConfig({ showBarcode: e.target.checked })}
-                  />
-                  <span>แสดงบาร์โค้ดด้านล่างสติกเกอร์</span>
-                </label>
-                {config.showBarcode && (config.barcodeDigits || config.barcodeCaption) && (
-                  <button
-                    type="button"
-                    onClick={() => patchConfig({ barcodeDigits: '', barcodeCaption: '' })}
-                    className="text-[10px] text-[#e8c170] hover:underline"
-                  >
-                    เว้นว่างไว้เขียนเอง
-                  </button>
-                )}
-              </div>
-              {config.showBarcode && (
-                <div className="space-y-1">
-                  <input
-                    type="text"
-                    value={config.barcodeDigits}
-                    onChange={(e) => patchConfig({ barcodeDigits: e.target.value })}
-                    placeholder="เลขบาร์โค้ด เช่น 8 851234 567890"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                  />
-                  <input
-                    type="text"
-                    value={config.barcodeCaption}
-                    onChange={(e) => patchConfig({ barcodeCaption: e.target.value })}
-                    placeholder="รหัสกำกับ เช่น CHIC-NAVY-L-01"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <div className="text-[11px] text-[#a99784]">รูปแบบเส้นเมื่อเว้นว่างไว้เขียนมือ</div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => patchConfig({ writeInLineStyle: 'solid' })}
-                  className={`flex-1 py-1.5 rounded-lg border text-xs ${
-                    config.writeInLineStyle === 'solid'
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
-                      : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21]'
-                  }`}
-                >
-                  เส้นทึบ (____)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => patchConfig({ writeInLineStyle: 'dashed' })}
-                  className={`flex-1 py-1.5 rounded-lg border text-xs ${
-                    config.writeInLineStyle === 'dashed'
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
-                      : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21]'
-                  }`}
-                >
-                  เส้นประ (- - -)
-                </button>
-              </div>
-              <label className="flex items-center gap-2 text-[11px] text-[#cfc2b2] pt-1 cursor-pointer">
+          {/* Barcode Option */}
+          <div className="pt-3 border-t border-[#3a2a1f] space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2.5 text-sm font-medium text-[#f5efe6] cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.showCutBorder}
-                  onChange={(e) => patchConfig({ showCutBorder: e.target.checked })}
+                  checked={config.showBarcode}
+                  onChange={(e) => patchConfig({ showBarcode: e.target.checked })}
+                  className="w-4 h-4 rounded accent-[#e8c170]"
                 />
-                <span>แสดงกรอบตัดสติกเกอร์</span>
+                <span>แสดงแถบบาร์โค้ด</span>
               </label>
+              {config.showBarcode && (config.barcodeDigits || config.barcodeCaption) && (
+                <button
+                  type="button"
+                  onClick={() => patchConfig({ barcodeDigits: '', barcodeCaption: '' })}
+                  className="text-xs text-[#e8c170] hover:underline"
+                >
+                  เว้นว่างไว้เขียนเอง
+                </button>
+              )}
             </div>
+            {config.showBarcode && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <input
+                  type="text"
+                  value={config.barcodeDigits}
+                  onChange={(e) => patchConfig({ barcodeDigits: e.target.value })}
+                  placeholder="เลขบาร์โค้ด เช่น 8 851234 567890"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] font-mono text-sm text-[#faf5ee]"
+                />
+                <input
+                  type="text"
+                  value={config.barcodeCaption}
+                  onChange={(e) => patchConfig({ barcodeCaption: e.target.value })}
+                  placeholder="รหัสข้อความกำกับ เช่น 1103-XL"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm text-[#faf5ee]"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Text Scaling Controls (Compact) */}
-          <div className="pt-2 border-t border-[#2d2118] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold text-[#d6c8b6]">
-                ขนาดตัวอักษร ({config.fontScalePct ?? 100}%)
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={60}
-                  max={140}
-                  step={5}
-                  value={config.fontScalePct ?? 100}
-                  onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
-                  className="w-28 sm:w-36 accent-[#e8c170]"
-                />
-                <span className="font-mono text-xs text-[#faf5ee] w-10 text-right">
-                  {config.fontScalePct ?? 100}%
-                </span>
-              </div>
+          {/* Text Scaling Slider */}
+          <div className="pt-3 border-t border-[#3a2a1f] flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-semibold text-[#d6c8b6]">
+              ขยายขนาดตัวอักษรบนสติกเกอร์
+            </div>
+            <div className="flex items-center gap-2.5">
+              <input
+                type="range"
+                min={60}
+                max={150}
+                step={5}
+                value={config.fontScalePct ?? 100}
+                onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
+                className="w-36 sm:w-48 accent-[#e8c170]"
+              />
+              <span className="font-mono text-xs font-bold text-[#e8c170] w-12 text-right">
+                {config.fontScalePct ?? 100}%
+              </span>
             </div>
           </div>
         </div>
