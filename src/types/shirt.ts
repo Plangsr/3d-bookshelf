@@ -98,6 +98,10 @@ export interface StickerConfig {
   modelFontScalePct?: number;
   colorFontScalePct?: number;
   sizeFontScalePct?: number;
+  /** Individual text scale (%) for front labels MODEL:, COLOR:, SIZE: (default 100) */
+  modelLabelFontScalePct?: number;
+  colorLabelFontScalePct?: number;
+  sizeLabelFontScalePct?: number;
   /** Text alignment across sticker fields: 'left' | 'center' | 'right' */
   textAlign?: 'left' | 'center' | 'right';
   /** Detail spacing mode: 'auto' shrinks padding/gaps when sticker <= 36x46mm */

@@ -723,14 +723,17 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             </div>
 
             {/* ปรับขนาดข้อความแยกแต่ละช่อง: รุ่น (MODEL) / สี (COLOR) / ไซส์ (SIZE) */}
-            <div className="rounded-xl border border-[#3a2a1f] bg-[#120d0a] p-3.5 space-y-2.5">
+            <div className="rounded-xl border border-[#3a2a1f] bg-[#120d0a] p-3.5 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs sm:text-sm font-semibold text-[#e8c170]">
                   ปรับขนาดข้อความแยกแต่ละช่อง (รุ่น / สี / ไซส์)
                 </span>
                 {((config.modelFontScalePct ?? 100) !== 100 ||
                   (config.colorFontScalePct ?? 100) !== 100 ||
-                  (config.sizeFontScalePct ?? 100) !== 100) && (
+                  (config.sizeFontScalePct ?? 100) !== 100 ||
+                  (config.modelLabelFontScalePct ?? 100) !== 100 ||
+                  (config.colorLabelFontScalePct ?? 100) !== 100 ||
+                  (config.sizeLabelFontScalePct ?? 100) !== 100) && (
                   <button
                     type="button"
                     onClick={() =>
@@ -738,6 +741,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                         modelFontScalePct: 100,
                         colorFontScalePct: 100,
                         sizeFontScalePct: 100,
+                        modelLabelFontScalePct: 100,
+                        colorLabelFontScalePct: 100,
+                        sizeLabelFontScalePct: 100,
                       })
                     }
                     className="text-[11px] sm:text-xs text-[#cbbba9] hover:text-[#e8c170] underline"
@@ -748,65 +754,90 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
-                    <span>รุ่น (MODEL)</span>
-                    <span className="font-mono font-bold text-[#e8c170]">
-                      {config.modelFontScalePct ?? 100}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={50}
-                    max={250}
-                    step={5}
-                    value={config.modelFontScalePct ?? 100}
-                    onChange={(e) =>
-                      patchConfig({ modelFontScalePct: Number(e.target.value) || 100 })
-                    }
-                    className="w-full accent-[#e8c170]"
-                  />
-                </label>
+                {(
+                  [
+                    {
+                      title: 'รุ่น (MODEL)',
+                      prefix: 'MODEL:',
+                      valueKey: 'modelFontScalePct',
+                      labelKey: 'modelLabelFontScalePct',
+                    },
+                    {
+                      title: 'สี (COLOR)',
+                      prefix: 'COLOR:',
+                      valueKey: 'colorFontScalePct',
+                      labelKey: 'colorLabelFontScalePct',
+                    },
+                    {
+                      title: 'ไซส์ (SIZE)',
+                      prefix: 'SIZE:',
+                      valueKey: 'sizeFontScalePct',
+                      labelKey: 'sizeLabelFontScalePct',
+                    },
+                  ] as const
+                ).map((item) => {
+                  const valPct = config[item.valueKey] ?? 100;
+                  const lblPct = config[item.labelKey] ?? 100;
+                  return (
+                    <div
+                      key={item.valueKey}
+                      className="rounded-lg border border-[#2c1f16] bg-[#18110c] p-2.5 space-y-2"
+                    >
+                      <label className="block space-y-1">
+                        <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
+                          <span>{item.title}</span>
+                          <span className="font-mono font-bold text-[#e8c170]">{valPct}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={50}
+                          max={250}
+                          step={5}
+                          value={valPct}
+                          onChange={(e) =>
+                            patchConfig({ [item.valueKey]: Number(e.target.value) || 100 })
+                          }
+                          className="w-full accent-[#e8c170]"
+                        />
+                      </label>
 
-                <label className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
-                    <span>สี (COLOR)</span>
-                    <span className="font-mono font-bold text-[#e8c170]">
-                      {config.colorFontScalePct ?? 100}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={50}
-                    max={250}
-                    step={5}
-                    value={config.colorFontScalePct ?? 100}
-                    onChange={(e) =>
-                      patchConfig({ colorFontScalePct: Number(e.target.value) || 100 })
-                    }
-                    className="w-full accent-[#e8c170]"
-                  />
-                </label>
-
-                <label className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
-                    <span>ไซส์ (SIZE)</span>
-                    <span className="font-mono font-bold text-[#e8c170]">
-                      {config.sizeFontScalePct ?? 100}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={50}
-                    max={250}
-                    step={5}
-                    value={config.sizeFontScalePct ?? 100}
-                    onChange={(e) =>
-                      patchConfig({ sizeFontScalePct: Number(e.target.value) || 100 })
-                    }
-                    className="w-full accent-[#e8c170]"
-                  />
-                </label>
+                      <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#2c1f16]">
+                        <span className="text-[11px] text-[#a99784] truncate">
+                          หัวข้อ {item.prefix}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchConfig({
+                                [item.labelKey]: Math.max(50, lblPct - 10),
+                              })
+                            }
+                            className="w-6 h-6 rounded bg-[#291e16] hover:bg-[#3a2a1f] border border-[#4a3728] text-xs font-bold text-[#f5efe6] flex items-center justify-center active:scale-95"
+                            title={`ลดขนาด ${item.prefix}`}
+                          >
+                            -
+                          </button>
+                          <span className="font-mono text-[11px] font-bold text-[#e8c170] w-9 text-center">
+                            {lblPct}%
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchConfig({
+                                [item.labelKey]: Math.min(250, lblPct + 10),
+                              })
+                            }
+                            className="w-6 h-6 rounded bg-[#291e16] hover:bg-[#3a2a1f] border border-[#4a3728] text-xs font-bold text-[#f5efe6] flex items-center justify-center active:scale-95"
+                            title={`เพิ่มขนาด ${item.prefix}`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

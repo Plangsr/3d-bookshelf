@@ -167,6 +167,14 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
   const colorValueEm = (metrics.isCompact ? 1.2 : 1.35) * colorScale;
   const sizeValueEm = (metrics.isCompact ? 2.2 : 2.6) * sizeScale;
 
+  const baseLabelEm = metrics.isCompact ? 0.74 : 0.82;
+  const modelLabelEm =
+    baseLabelEm * Math.max(0.5, Math.min(2.5, (config.modelLabelFontScalePct ?? 100) / 100));
+  const colorLabelEm =
+    baseLabelEm * Math.max(0.5, Math.min(2.5, (config.colorLabelFontScalePct ?? 100) / 100));
+  const sizeLabelEm =
+    baseLabelEm * Math.max(0.5, Math.min(2.5, (config.sizeLabelFontScalePct ?? 100) / 100));
+
   const align = config.textAlign ?? 'left';
   const textAlignClass =
     align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
@@ -224,9 +232,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
-              className={`${
-                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
+              style={{ fontSize: `${modelLabelEm.toFixed(3)}em` }}
+              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
             >
               MODEL:
             </span>
@@ -247,9 +254,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
-              className={`${
-                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
+              style={{ fontSize: `${colorLabelEm.toFixed(3)}em` }}
+              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
             >
               COLOR:
             </span>
@@ -270,9 +276,8 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
-              className={`${
-                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
+              style={{ fontSize: `${sizeLabelEm.toFixed(3)}em` }}
+              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
             >
               SIZE:
             </span>
