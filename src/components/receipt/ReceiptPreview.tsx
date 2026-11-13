@@ -857,6 +857,20 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
           </div>
         </div>
       )}
+
+      {draft.slipImageDataUrl && draft.includeSlipOnPrint !== false && (
+        <div className="mt-[0.8em] pt-[0.6em] border-t border-dashed border-neutral-300 text-center">
+          <div className="text-[0.72em] font-semibold text-neutral-600 mb-[0.35em]">
+            หลักฐานการโอนเงิน / Payment Slip
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={draft.slipImageDataUrl}
+            alt={draft.slipFileName || 'Payment Slip'}
+            className="mx-auto max-h-[42mm] max-w-full object-contain border border-neutral-200 rounded"
+          />
+        </div>
+      )}
     </div>
   );
 };

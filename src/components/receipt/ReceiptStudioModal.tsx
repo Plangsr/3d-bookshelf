@@ -337,6 +337,8 @@ const ReceiptStudioContent: React.FC<Omit<ReceiptStudioModalProps, 'isOpen'>> = 
       shippingFee: syncedDraft.shippingFee,
       vatMode: syncedDraft.vatMode,
       hidePricesOnSlip: syncedDraft.hidePricesOnSlip,
+      slipFileName: syncedDraft.slipFileName,
+      includeSlipOnPrint: syncedDraft.includeSlipOnPrint,
       notes: syncedDraft.notes,
       subtotal: totals.subtotal,
       vatAmount: totals.vatAmount,
@@ -1071,6 +1073,90 @@ const ReceiptStudioContent: React.FC<Omit<ReceiptStudioModalProps, 'isOpen'>> = 
                 </div>
               </div>
 
+              {/* Client-Side Slip Upload (No Server Upload) */}
+              <div className="rounded-xl border border-[#3b2c21] bg-[#130d0a] p-3 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold text-[#f5efe6]">
+                      อัปโหลดสลิปโอนเงิน (ประมวลผลในเครื่อง ไม่ส่งขึ้น Server)
+                    </div>
+                    <div className="text-[11px] text-[#a79582]">
+                      รูปสลิปจะแสดงและพิมพ์จากเบราว์เซอร์โดยตรง ไม่มีการอัปโหลดไฟล์ไปยังเซิร์ฟเวอร์
+                    </div>
+                  </div>
+                  <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170]">
+                    <span>{syncedDraft.slipImageDataUrl ? 'เปลี่ยนรูปสลิป' : 'เลือกรูปสลิป'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') {
+                            patchDraft({
+                              slipImageDataUrl: reader.result,
+                              slipFileName: file.name,
+                              includeSlipOnPrint: syncedDraft.includeSlipOnPrint ?? true,
+                            });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {syncedDraft.slipImageDataUrl && (
+                  <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-[#2b2018]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={syncedDraft.slipImageDataUrl}
+                      alt={syncedDraft.slipFileName || 'Payment Slip'}
+                      className="w-14 h-16 object-cover rounded-lg border border-[#4a3829] bg-black/30"
+                    />
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="text-xs text-[#f5efe6] truncate">
+                        {syncedDraft.slipFileName || 'สลิปที่แนบไว้'}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchDraft({ includeSlipOnPrint: !syncedDraft.includeSlipOnPrint })
+                          }
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] transition-colors ${
+                            syncedDraft.includeSlipOnPrint !== false
+                              ? 'bg-[#e8c170]/15 border-[#e8c170] text-[#f5da98]'
+                              : 'bg-[#1c1410] border-[#3b2c21] text-[#a79582]'
+                          }`}
+                        >
+                          {syncedDraft.includeSlipOnPrint !== false
+                            ? '✓ แสดงสลิปบนใบเสร็จตอนพิมพ์'
+                            : 'ซ่อนสลิปตอนพิมพ์'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchDraft({
+                              slipImageDataUrl: undefined,
+                              slipFileName: undefined,
+                              includeSlipOnPrint: undefined,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg border border-red-900/50 bg-red-950/30 text-red-300 text-[11px] hover:bg-red-950/50"
+                        >
+                          ลบสลิป
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Financial adjustments */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -1354,10 +1440,11 @@ const ReceiptStudioContent: React.FC<Omit<ReceiptStudioModalProps, 'isOpen'>> = 
                   <button
                     type="button"
                     onClick={() => triggerPrint()}
+                    title="พิมพ์หรือบันทึกเป็น PDF จากเบราว์เซอร์โดยตรง ไม่ต้องอัปโหลดข้อมูลขึ้น Server"
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-xs font-bold shadow-lg transition-transform active:scale-95"
                   >
                     <Printer className="w-4 h-4" />
-                    <span>พิมพ์ใบเสร็จ / Save PDF</span>
+                    <span>พิมพ์ทันที / Save PDF (ไม่ส่งขึ้น Server)</span>
                   </button>
                 </div>
               </div>

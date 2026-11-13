@@ -106,6 +106,9 @@ export interface ReceiptRecord {
   shippingFee: number;
   vatMode: VatMode;
   hidePricesOnSlip?: boolean;
+  slipImageDataUrl?: string;
+  slipFileName?: string;
+  includeSlipOnPrint?: boolean;
   notes: string;
   subtotal: number;
   vatAmount: number;
