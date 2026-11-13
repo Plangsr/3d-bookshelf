@@ -40,8 +40,14 @@ body {
     padding: 0 !important;
   }
 
-  /* Hide app main container during print so screen layout never affects paper,
-     BUT let #printable-batch-root inside it remain rendered in the print tree */
+  /* When printable root is a direct child of body (via Portal or Receipt root),
+     hide <main> completely so screen UI takes 0 height and 0 pages */
+  body:has(> #printable-batch-root) > main,
+  body:has(> #printable-receipt-root) > main {
+    display: none !important;
+  }
+
+  /* Fallback when printable container is inside <main> */
   body > main {
     display: block !important;
     position: static !important;

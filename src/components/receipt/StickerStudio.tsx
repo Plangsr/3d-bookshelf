@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlignCenter,
   AlignLeft,
@@ -878,116 +879,119 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
         />
       </div>
 
-      {/* Print-Only Calibrated Batch Stickers Container */}
-      {activeBatchCopies > 0 && (
-        <div id="printable-batch-root" className="hidden print:block">
-          {printLayoutMode === 'grid'
-            ? gridPages.map((pageItems, pageIdx) => {
-                const pageW =
-                  calibration.orientation === 'landscape' && calibration.paperHeightMm
-                    ? calibration.paperHeightMm
-                    : calibration.paperWidthMm;
-                const pageH =
-                  calibration.paperHeightMm === null
-                    ? null
-                    : calibration.orientation === 'landscape'
-                    ? calibration.paperWidthMm
-                    : calibration.paperHeightMm;
-                return (
-                  <div
-                    key={pageIdx}
-                    style={{
-                      width: `${pageW}mm`,
-                      height: pageH !== null ? `${pageH}mm` : 'auto',
-                      paddingTop: `${calibration.marginTopMm}mm`,
-                      paddingRight: `${calibration.marginRightMm}mm`,
-                      paddingBottom: `${calibration.marginBottomMm}mm`,
-                      paddingLeft: `${calibration.marginLeftMm}mm`,
-                      boxSizing: 'border-box',
-                    }}
-                    className="print-page-break bg-white"
-                  >
+      {/* Print-Only Calibrated Batch Stickers Container (Portal to body so <main> can be hidden cleanly) */}
+      {activeBatchCopies > 0 &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div id="printable-batch-root" className="hidden print:block">
+            {printLayoutMode === 'grid'
+              ? gridPages.map((pageItems, pageIdx) => {
+                  const pageW =
+                    calibration.orientation === 'landscape' && calibration.paperHeightMm
+                      ? calibration.paperHeightMm
+                      : calibration.paperWidthMm;
+                  const pageH =
+                    calibration.paperHeightMm === null
+                      ? null
+                      : calibration.orientation === 'landscape'
+                      ? calibration.paperWidthMm
+                      : calibration.paperHeightMm;
+                  return (
                     <div
+                      key={pageIdx}
                       style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: `${gridGapMm}mm`,
-                        transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
+                        width: `${pageW}mm`,
+                        height: pageH !== null ? `${Math.max(5, pageH - 0.5)}mm` : 'auto',
+                        paddingTop: `${calibration.marginTopMm}mm`,
+                        paddingRight: `${calibration.marginRightMm}mm`,
+                        paddingBottom: `${calibration.marginBottomMm}mm`,
+                        paddingLeft: `${calibration.marginLeftMm}mm`,
+                        boxSizing: 'border-box',
                       }}
+                      className={`${gridPages.length > 1 ? 'print-page-break ' : ''}bg-white`}
                     >
-                      {pageItems.map((itemIdx) => (
-                        <div
-                          key={itemIdx}
-                          style={{
-                            width: `${stickerBoxWidthMm}mm`,
-                          }}
-                        >
-                          <StickerLabelPreview
-                            config={config}
-                            widthMm={stickerBoxWidthMm}
-                            heightMm={stickerBoxHeightMm}
-                          />
-                        </div>
-                      ))}
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: `${gridGapMm}mm`,
+                          transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
+                        }}
+                      >
+                        {pageItems.map((itemIdx) => (
+                          <div
+                            key={itemIdx}
+                            style={{
+                              width: `${stickerBoxWidthMm}mm`,
+                            }}
+                          >
+                            <StickerLabelPreview
+                              config={config}
+                              widthMm={stickerBoxWidthMm}
+                              heightMm={stickerBoxHeightMm}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            : Array.from({ length: activeBatchCopies }, (_, idx) => {
-                const isLandscape =
-                  calibration.orientation === 'landscape' &&
-                  calibration.paperHeightMm !== null;
-                const pageW =
-                  isLandscape && calibration.paperHeightMm
-                    ? calibration.paperHeightMm
-                    : calibration.paperWidthMm;
-                const pageH =
-                  calibration.paperHeightMm === null
-                    ? null
-                    : isLandscape
-                    ? calibration.paperWidthMm
-                    : calibration.paperHeightMm;
-                const safeContentW =
-                  Math.max(5, pageW - calibration.marginLeftMm - calibration.marginRightMm) *
-                  (calibration.contentWidthPct / 100);
-                const safeContentH =
-                  pageH !== null
-                    ? Math.max(5, pageH - calibration.marginTopMm - calibration.marginBottomMm) *
-                      ((calibration.contentHeightPct ?? 100) / 100)
-                    : null;
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      width: `${pageW}mm`,
-                      height: pageH !== null ? `${pageH}mm` : 'auto',
-                      paddingTop: `${calibration.marginTopMm}mm`,
-                      paddingRight: `${calibration.marginRightMm}mm`,
-                      paddingBottom: `${calibration.marginBottomMm}mm`,
-                      paddingLeft: `${calibration.marginLeftMm}mm`,
-                      boxSizing: 'border-box',
-                      overflow: pageH !== null ? 'hidden' : 'visible',
-                    }}
-                    className="print-page-break bg-white"
-                  >
+                  );
+                })
+              : Array.from({ length: activeBatchCopies }, (_, idx) => {
+                  const isLandscape =
+                    calibration.orientation === 'landscape' &&
+                    calibration.paperHeightMm !== null;
+                  const pageW =
+                    isLandscape && calibration.paperHeightMm
+                      ? calibration.paperHeightMm
+                      : calibration.paperWidthMm;
+                  const pageH =
+                    calibration.paperHeightMm === null
+                      ? null
+                      : isLandscape
+                      ? calibration.paperWidthMm
+                      : calibration.paperHeightMm;
+                  const safeContentW =
+                    Math.max(5, pageW - calibration.marginLeftMm - calibration.marginRightMm) *
+                    (calibration.contentWidthPct / 100);
+                  const safeContentH =
+                    pageH !== null
+                      ? Math.max(5, pageH - calibration.marginTopMm - calibration.marginBottomMm) *
+                        ((calibration.contentHeightPct ?? 100) / 100)
+                      : null;
+                  return (
                     <div
+                      key={idx}
                       style={{
-                        width: `${calibration.contentWidthPct}%`,
-                        transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
-                        transformOrigin: 'top left',
+                        width: `${pageW}mm`,
+                        height: pageH !== null ? `${Math.max(5, pageH - 0.5)}mm` : 'auto',
+                        paddingTop: `${calibration.marginTopMm}mm`,
+                        paddingRight: `${calibration.marginRightMm}mm`,
+                        paddingBottom: `${calibration.marginBottomMm}mm`,
+                        paddingLeft: `${calibration.marginLeftMm}mm`,
+                        boxSizing: 'border-box',
+                        overflow: pageH !== null ? 'hidden' : 'visible',
                       }}
+                      className={`${activeBatchCopies > 1 ? 'print-page-break ' : ''}bg-white`}
                     >
-                      <StickerLabelPreview
-                        config={config}
-                        widthMm={safeContentW}
-                        heightMm={safeContentH}
-                      />
+                      <div
+                        style={{
+                          width: `${calibration.contentWidthPct}%`,
+                          transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
+                          transformOrigin: 'top left',
+                        }}
+                      >
+                        <StickerLabelPreview
+                          config={config}
+                          widthMm={safeContentW}
+                          heightMm={safeContentH}
+                        />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-        </div>
-      )}
+                  );
+                })}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

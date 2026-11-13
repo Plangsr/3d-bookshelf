@@ -260,26 +260,12 @@ export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): vo
     calibration.paperHeightMm === null
       ? 'auto'
       : `${isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm}mm`;
-  // Set exact @page size and 0mm margin so thermal printer page break is strictly 1 single label (no phantom pages)
+  // Set exact @page size and 0mm margin so thermal printer page break matches the physical label
   styleEl.textContent = `
     @media print {
       @page {
         size: ${width}mm ${height};
         margin: 0mm !important;
-      }
-      html, body {
-        width: ${width}mm !important;
-        height: ${height} !important;
-        max-height: ${height} !important;
-        overflow: hidden !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      #printable-batch-root {
-        width: ${width}mm !important;
-        height: ${height} !important;
-        max-height: ${height} !important;
-        overflow: hidden !important;
       }
     }
   `;
