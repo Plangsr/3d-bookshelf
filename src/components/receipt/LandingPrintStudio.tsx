@@ -72,7 +72,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   onOpenSizeManager,
   onSwitchTo3DRack,
 }) => {
-  const [studioTab, setStudioTab] = useState<'quick' | 'sticker' | 'builder'>('quick');
+  const [studioTab, setStudioTab] = useState<'quick' | 'sticker' | 'builder'>('sticker');
   const [printSets, setPrintSets] = useState<PrintSet[]>(() => loadPrintSets());
   const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [setNameInput, setSetNameInput] = useState<string>('');
@@ -331,41 +331,24 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   return (
     <div className="min-h-screen w-full bg-[#120d0a] text-[#f5efe6] pt-4 pb-10 px-4 sm:px-6 overflow-y-auto">
       <div className="max-w-7xl mx-auto space-y-5">
-        {/* Top Hero Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3a2a1f] bg-[#1a130e] px-5 py-4">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold text-[#f7f1e8]">
-              หน้าหลัก: อัปโหลดสลิป • จัดการ Set การพิมพ์ • พิมพ์หลายใบพร้อมกัน
+        {/* Top Header Strip (Cleaned up & Compact) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3a2a1f] bg-[#1a130e] px-4 py-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-[#f7f1e8]">
+              สตูดิโอพิมพ์สติกเกอร์ &amp; ป้ายสินค้า
             </h2>
-            <p className="text-xs text-[#b5a390] mt-0.5">
-              ทำงานบนเบราว์เซอร์ 100% พิมพ์ได้ทันที (รองรับ 1 – 1,000+ ใบในรอบเดียว) โดยไม่ต้องอัปโหลดลง Server
-            </p>
+            <span className="hidden sm:inline text-xs text-[#a99784] border-l border-[#3a2a1f] pl-3">
+              พิมพ์โดยตรงผ่านเบราว์เซอร์
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href="https://docs.google.com/spreadsheets/d/1i_tTqQkL7kd279Nc04-L_l7atRodk_145kFPMejfh3U/edit"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#18291e] hover:bg-[#213829] border border-[#2f523a] text-xs font-semibold text-[#86efac]"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>ดูตารางข้อมูล Google Sheet</span>
-            </a>
             <button
               type="button"
               onClick={onOpenSizeManager}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170]"
             >
-              <Ruler className="w-4 h-4" />
-              <span>ตั้งค่า / สร้าง Preset ขนาดกระดาษ</span>
-            </button>
-            <button
-              type="button"
-              onClick={onSwitchTo3DRack}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#130d0a] hover:bg-[#231912] border border-[#3b2c21] text-xs font-medium text-[#d8cbb8]"
-            >
-              <Layers className="w-4 h-4 text-[#e8c170]" />
-              <span>ไปหน้าราวแขวนเสื้อ 3D</span>
+              <Ruler className="w-3.5 h-3.5" />
+              <span>ขนาดกระดาษ / เครื่องพิมพ์</span>
             </button>
           </div>
         </div>
@@ -377,40 +360,31 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
         )}
 
         {/* Mode Tabs */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setStudioTab('quick')}
-            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
-              studioTab === 'quick'
-                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
-                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
-            }`}
-          >
-            พิมพ์ด่วนจากไฟล์ใบเสร็จของร้าน (เลือกขนาด Preset)
-          </button>
-          <button
-            type="button"
-            onClick={() => setStudioTab('sticker')}
-            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
-              studioTab === 'sticker'
-                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
-                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
-            }`}
-          >
-            สร้างสติกเกอร์แปะเสื้อ (รุ่น • สี • ไซส์)
-          </button>
-          <button
-            type="button"
-            onClick={() => setStudioTab('builder')}
-            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
-              studioTab === 'builder'
-                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
-                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
-            }`}
-          >
-            สร้างใบเสร็จจากรายการเสื้อ &amp; Set การพิมพ์
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2d2118] pb-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setStudioTab('sticker')}
+              className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+                studioTab === 'sticker'
+                  ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                  : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
+              }`}
+            >
+              🏷️ สติกเกอร์แปะเสื้อ (รุ่น • สี • ไซส์)
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioTab('quick')}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-medium transition-all ${
+                studioTab === 'quick'
+                  ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
+                  : 'bg-[#1a130e]/60 text-[#a99784] border-[#3a2a1f]/60 hover:text-[#d6c8b6]'
+              }`}
+            >
+              พิมพ์ด่วนจากไฟล์ PDF/รูปสลิป
+            </button>
+          </div>
         </div>
 
         {studioTab === 'quick' ? (

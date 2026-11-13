@@ -328,46 +328,26 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             </button>
           </div>
 
-          {/* Quick Pick from Catalog (Optional) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-[11px] text-[#d6c8b6] mb-1">
-                ดึงจากรายการเสื้อ (ไม่บังคับ)
+          {/* Brand Header */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] text-[#d6c8b6]">ชื่อแบรนด์หัวสติกเกอร์</label>
+              <label className="flex items-center gap-1 text-[10px] text-[#e8c170] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showBrandHeader}
+                  onChange={(e) => patchConfig({ showBrandHeader: e.target.checked })}
+                />
+                <span>แสดงหัวแบรนด์</span>
               </label>
-              <select
-                defaultValue=""
-                onChange={(e) => handleFillFromCatalogShirt(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-              >
-                <option value="">-- เลือกเพื่อเติมข้อมูลเร็ว หรือพิมพ์เองด้านล่าง --</option>
-                {shirts.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.sku} — {s.name}
-                  </option>
-                ))}
-              </select>
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] text-[#d6c8b6]">ชื่อแบรนด์หัวสติกเกอร์</label>
-                <label className="flex items-center gap-1 text-[10px] text-[#e8c170] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.showBrandHeader}
-                    onChange={(e) => patchConfig({ showBrandHeader: e.target.checked })}
-                  />
-                  <span>แสดงหัวแบรนด์</span>
-                </label>
-              </div>
-              <input
-                type="text"
-                value={config.brandHeader}
-                onChange={(e) => patchConfig({ brandHeader: e.target.value })}
-                placeholder="เช่น THAI APPAREL"
-                className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
-              />
-            </div>
+            <input
+              type="text"
+              value={config.brandHeader}
+              onChange={(e) => patchConfig({ brandHeader: e.target.value })}
+              placeholder="เช่น THAI APPAREL"
+              className="w-full px-3 py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+            />
           </div>
 
           {/* รุ่น (Model) */}
@@ -554,76 +534,26 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             </div>
           </div>
 
-          {/* Text & Detail Scaling Controls (Auto + Fine-Tune for small 30x40 labels) */}
+          {/* Text Scaling Controls (Compact) */}
           <div className="pt-2 border-t border-[#2d2118] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-[11px] font-semibold text-[#d6c8b6]">
-                ขนาดตัวอักษร &amp; รายละเอียด ({config.fontScalePct ?? 100}% • ปรับตามขนาดสติกเกอร์อัตโนมัติ)
+                ขนาดตัวอักษร ({config.fontScalePct ?? 100}%)
               </div>
               <div className="flex items-center gap-1.5">
-                <FreeNumberInput
-                  min={45}
-                  max={160}
+                <input
+                  type="range"
+                  min={60}
+                  max={140}
                   step={5}
                   value={config.fontScalePct ?? 100}
-                  onChangeNumber={(pct) => patchConfig({ fontScalePct: pct })}
-                  aria-label="สัดส่วนขนาดตัวอักษรเปอร์เซ็นต์"
-                  className="w-16 px-2 py-0.5 rounded-lg bg-[#120d0a] border border-[#443326] font-mono text-xs text-[#faf5ee] text-center"
+                  onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
+                  className="w-28 sm:w-36 accent-[#e8c170]"
                 />
-                <span className="text-[11px] text-[#a99784]">%</span>
+                <span className="font-mono text-xs text-[#faf5ee] w-10 text-right">
+                  {config.fontScalePct ?? 100}%
+                </span>
               </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="range"
-                min={50}
-                max={150}
-                step={5}
-                value={config.fontScalePct ?? 100}
-                onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
-                className="flex-1 min-w-[140px] accent-[#e8c170]"
-              />
-              <div className="flex flex-wrap gap-1">
-                {FONT_SCALE_PRESETS.map((p) => (
-                  <button
-                    key={p.pct}
-                    type="button"
-                    onClick={() => patchConfig({ fontScalePct: p.pct })}
-                    className={`px-2 py-0.5 rounded-md border text-[10px] ${
-                      (config.fontScalePct ?? 100) === p.pct
-                        ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
-                        : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21]'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="text-[#a99784] mr-1">ความกระชับช่องไฟ:</span>
-              {(
-                [
-                  { id: 'auto', label: 'อัตโนมัติ (กระชับเมื่อ ≤ 36mm)' },
-                  { id: 'compact', label: 'กระชับพิเศษ (เหมาะ 30×40)' },
-                  { id: 'normal', label: 'โปร่ง (สติกเกอร์ใหญ่)' },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => patchConfig({ detailDensity: opt.id })}
-                  className={`px-2 py-0.5 rounded-md border text-[10px] ${
-                    (config.detailDensity ?? 'auto') === opt.id
-                      ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98] font-bold'
-                      : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
             </div>
           </div>
         </div>
