@@ -91,15 +91,15 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   });
 
   const [config, setConfig] = useState<StickerConfig>(() => ({
-    brandHeader: shopProfile.shopName || 'THAI APPAREL',
-    showBrandHeader: true,
-    modelName: shirts[0]?.name || 'CHIC CASUAL V.1',
-    colorName: shirts[0] ? formatColorDisplayName(shirts[0].color) : 'กรมท่า (NAVY BLUE)',
+    brandHeader: shopProfile.shopName || '',
+    showBrandHeader: false,
+    modelName: shirts[0]?.name || '111036',
+    colorName: shirts[0] ? formatColorDisplayName(shirts[0].color) : 'Pink',
     sizeLabel: 'L',
     writeInLineStyle: 'solid',
     showBarcode: true,
     barcodeDigits: '8 851234 567890',
-    barcodeCaption: `${shirts[0]?.sku || 'AT-TEE-01'}-L`,
+    barcodeCaption: `${shirts[0]?.sku || '111036'}-L`,
     borderRadiusMm: 2,
     showCutBorder: true,
     fontScalePct: 100,
@@ -170,7 +170,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     const newSet: StickerSet = {
       id: `stk-${Date.now()}`,
       name,
-      config: { ...config },
+      config: { ...config, showBrandHeader: false },
       paperSizeId: selectedPaperSizeId,
       calibration: { ...calibration },
       defaultCopies: Math.max(1, copies),
@@ -181,18 +181,46 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     saveStickerSets(next);
     setSelectedSetId(newSet.id);
     setSetNameInput(newSet.name);
-    setStatusText(`สร้าง Set สติกเกอร์ "${newSet.name}" เรียบร้อยแล้ว`);
+    setStatusText(`บันทึก Preset สติกเกอร์ "${newSet.name}" เรียบร้อยแล้ว`);
+
+    // Sync to Google Sheets automatically
+    void (async () => {
+      try {
+        await fetch('/api/stickers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newSet.id,
+            modelName: config.modelName,
+            colorName: config.colorName,
+            sizeLabel: config.sizeLabel,
+            showBarcode: config.showBarcode,
+            barcodeDigits: config.barcodeDigits,
+            barcodeCaption: config.barcodeCaption,
+            paperWidthMm: calibration.paperWidthMm,
+            paperHeightMm: calibration.paperHeightMm,
+            copies: Math.max(1, copies),
+            fontScalePct: config.fontScalePct ?? 100,
+            presetName: newSet.name,
+            createdAt: newSet.updatedAt,
+          }),
+        });
+        setStatusText(`บันทึก Preset "${newSet.name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
+      } catch (err) {
+        console.warn('Google Sheets sync error:', err);
+      }
+    })();
   };
 
   const handleUpdateSet = () => {
     if (!selectedSetId) return;
-    const name = setNameInput.trim() || 'Set สติกเกอร์';
+    const name = setNameInput.trim() || 'Preset สติกเกอร์';
     const next = stickerSets.map((s) =>
       s.id === selectedSetId
         ? {
             ...s,
             name,
-            config: { ...config },
+            config: { ...config, showBrandHeader: false },
             paperSizeId: selectedPaperSizeId,
             calibration: { ...calibration },
             defaultCopies: Math.max(1, copies),
@@ -202,17 +230,45 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     );
     setStickerSets(next);
     saveStickerSets(next);
-    setStatusText(`อัปเดต Set สติกเกอร์ "${name}" แล้ว`);
+    setStatusText(`อัปเดต Preset สติกเกอร์ "${name}" แล้ว`);
+
+    // Sync updated preset to Google Sheets
+    void (async () => {
+      try {
+        await fetch('/api/stickers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: selectedSetId,
+            modelName: config.modelName,
+            colorName: config.colorName,
+            sizeLabel: config.sizeLabel,
+            showBarcode: config.showBarcode,
+            barcodeDigits: config.barcodeDigits,
+            barcodeCaption: config.barcodeCaption,
+            paperWidthMm: calibration.paperWidthMm,
+            paperHeightMm: calibration.paperHeightMm,
+            copies: Math.max(1, copies),
+            fontScalePct: config.fontScalePct ?? 100,
+            presetName: name,
+            createdAt: new Date().toISOString(),
+          }),
+        });
+        setStatusText(`อัปเดต Preset "${name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
+      } catch (err) {
+        console.warn('Google Sheets sync error:', err);
+      }
+    })();
   };
 
   const handleSelectSet = (setItem: StickerSet) => {
     setSelectedSetId(setItem.id);
     setSetNameInput(setItem.name);
-    setConfig({ ...setItem.config });
+    setConfig({ ...setItem.config, showBrandHeader: false });
     setSelectedPaperSizeId(setItem.paperSizeId);
     setCalibration({ ...setItem.calibration });
     setCopies(Math.max(1, setItem.defaultCopies || 1));
-    setStatusText(`โหลด Set "${setItem.name}" แล้ว`);
+    setStatusText(`โหลด Preset "${setItem.name}" แล้ว`);
   };
 
   const handleDeleteSet = (id: string) => {
@@ -223,14 +279,53 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       setSelectedSetId('');
       setSetNameInput('');
     }
-    setStatusText('ลบ Set สติกเกอร์แล้ว');
+    setStatusText('ลบ Preset สติกเกอร์แล้ว');
+
+    void (async () => {
+      try {
+        await fetch(`/api/stickers?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        console.warn('Google Sheets delete error:', err);
+      }
+    })();
   };
 
   const handlePrintStickers = () => {
     const safeCopies = Math.min(2000, Math.max(1, Math.floor(copies) || 1));
     applyFreePrintPageStyle(calibration);
     setActiveBatchCopies(safeCopies);
-    setStatusText(`กำลังพิมพ์สติกเกอร์ ${safeCopies.toLocaleString()} ดวง (ไม่ส่งขึ้น Server)...`);
+    setStatusText(`กำลังพิมพ์สติกเกอร์ ${safeCopies.toLocaleString()} ดวง...`);
+
+    // บันทึกลง Google Sheet ประวัติการพิมพ์ด้วย
+    void (async () => {
+      try {
+        await fetch('/api/stickers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `print-${Date.now()}`,
+            modelName: config.modelName,
+            colorName: config.colorName,
+            sizeLabel: config.sizeLabel,
+            showBarcode: config.showBarcode,
+            barcodeDigits: config.barcodeDigits,
+            barcodeCaption: config.barcodeCaption,
+            paperWidthMm: calibration.paperWidthMm,
+            paperHeightMm: calibration.paperHeightMm,
+            copies: safeCopies,
+            fontScalePct: config.fontScalePct ?? 100,
+            presetName: setNameInput.trim() || 'พิมพ์ทันที',
+            createdAt: new Date().toISOString(),
+            notes: 'Printed',
+          }),
+        });
+      } catch (err) {
+        console.warn('Print logging to sheets error:', err);
+      }
+    })();
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.print();
@@ -722,7 +817,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-xs font-bold shadow-lg transition-transform active:scale-95"
             >
               <Printer className="w-4 h-4" />
-              <span>พิมพ์สติกเกอร์ {copies.toLocaleString()} ดวง (ไม่ส่งขึ้น Server)</span>
+              <span>พิมพ์สติกเกอร์ {copies.toLocaleString()} ดวง & บันทึกลง Sheet</span>
             </button>
           </div>
         </div>
