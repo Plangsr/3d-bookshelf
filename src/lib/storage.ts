@@ -260,8 +260,29 @@ export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): vo
     calibration.paperHeightMm === null
       ? 'auto'
       : `${isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm}mm`;
-  // Set @page margin to 0mm so the page box's padding & offsets match the visual Paper Map 1:1.
-  styleEl.textContent = `@media print { @page { size: ${width}mm ${height}; margin: 0mm; } }`;
+  // Set exact @page size and 0mm margin so thermal printer page break is strictly 1 single label (no phantom pages)
+  styleEl.textContent = `
+    @media print {
+      @page {
+        size: ${width}mm ${height};
+        margin: 0mm !important;
+      }
+      html, body {
+        width: ${width}mm !important;
+        height: ${height} !important;
+        max-height: ${height} !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #printable-batch-root {
+        width: ${width}mm !important;
+        height: ${height} !important;
+        max-height: ${height} !important;
+        overflow: hidden !important;
+      }
+    }
+  `;
 }
 
 /**

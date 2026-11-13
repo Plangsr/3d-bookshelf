@@ -372,10 +372,10 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   };
 
   const handlePrintStickers = () => {
-    const safeCopies = Math.min(2000, Math.max(1, Math.floor(copies) || 1));
+    // 1 แผ่นตรงตามขนาดกระดาษสติกเกอร์เสมอ
     applyFreePrintPageStyle(calibration);
-    setActiveBatchCopies(safeCopies);
-    setStatusText(`กำลังพิมพ์สติกเกอร์ ${safeCopies.toLocaleString()} ดวง...`);
+    setActiveBatchCopies(1);
+    setStatusText('กำลังพิมพ์สติกเกอร์ 1 แผ่น...');
 
     // บันทึกลง Google Sheet ประวัติการพิมพ์ด้วย
     void (async () => {
@@ -393,7 +393,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             barcodeCaption: config.barcodeCaption,
             paperWidthMm: calibration.paperWidthMm,
             paperHeightMm: calibration.paperHeightMm,
-            copies: safeCopies,
+            copies: 1,
             fontScalePct: config.fontScalePct ?? 100,
             presetName: setNameInput.trim() || 'พิมพ์ทันที',
             createdAt: new Date().toISOString(),
@@ -685,14 +685,14 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   ขยายขนาดตัวอักษรบนสติกเกอร์ (Xprinter XP-490B)
                 </div>
                 <div className="text-[11px] sm:text-xs text-[#8e7a68]">
-                  ปรับขนาดตัวหนังสือให้ใหญ่เต็มพื้นที่พิมพ์จริง (สูงสุด 350%)
+                  ปรับขนาดตัวหนังสือให้ใหญ่เต็มพื้นที่พิมพ์จริง (สูงสุด 500%)
                 </div>
               </div>
               <div className="flex items-center gap-2.5">
                 <input
                   type="range"
                   min={60}
-                  max={350}
+                  max={500}
                   step={5}
                   value={config.fontScalePct ?? 100}
                   onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
@@ -800,157 +800,28 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           onApplyMappedPaperSize={handleSelectPaperPreset}
         />
 
-        {/* 4. Batch Sticker Printing (Roll vs Multi-Up A4 Grid) */}
-        <div className="rounded-2xl border border-[#e8c170]/35 bg-[#1a130e] p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-bold text-[#f7f1e8]">
-              3. ขนาดสติกเกอร์ด่วน &amp; พิมพ์หลายดวงพร้อมกัน (สูงสุด 2,000 ดวง)
-            </div>
-          </div>
-
-          {/* Quick Sticker Size Chips */}
-          <div className="flex flex-wrap gap-2">
-            {STICKER_QUICK_SIZES.map((qs) => (
-              <button
-                key={qs.label}
-                type="button"
-                onClick={() =>
-                  handleApplyStickerQuickSize(qs.w, qs.h, qs.m, qs.w === 210)
-                }
-                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all ${
-                  calibration.paperWidthMm === qs.w && calibration.paperHeightMm === qs.h
-                    ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold shadow-md scale-102'
-                    : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
-                }`}
-              >
-                {qs.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Single Roll vs Multi-Up Grid Toggle */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <button
-              type="button"
-              onClick={() => setPrintLayoutMode('single')}
-              className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
-                printLayoutMode === 'single'
-                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98]'
-                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2] hover:border-[#6a503b]'
-              }`}
-            >
-              เครื่องพิมพ์สติกเกอร์ (1 ดวง/แผ่น)
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrintLayoutMode('grid')}
-              className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                printLayoutMode === 'grid'
-                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98]'
-                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2] hover:border-[#6a503b]'
-              }`}
-            >
-              <Grid className="w-4 h-4" />
-              <span>เรียงหลายดวงในแผ่น A4/A5</span>
-            </button>
-          </div>
-
-          {printLayoutMode === 'grid' && (
-            <div className="bg-[#120d0a] p-2.5 rounded-xl border border-[#32241a] space-y-2 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div>
-                  <label className="block text-[10px] text-[#a99784]">กว้างสติกเกอร์ (mm)</label>
-                  <FreeNumberInput
-                    min={8}
-                    max={150}
-                    allowDecimal
-                    step={1}
-                    value={stickerBoxWidthMm}
-                    onChangeNumber={setStickerBoxWidthMm}
-                    aria-label="ความกว้างสติกเกอร์ต่อดวง mm"
-                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#a99784]">สูงสติกเกอร์ (mm)</label>
-                  <FreeNumberInput
-                    min={8}
-                    max={200}
-                    allowDecimal
-                    step={1}
-                    value={stickerBoxHeightMm}
-                    onChangeNumber={setStickerBoxHeightMm}
-                    aria-label="ความสูงสติกเกอร์ต่อดวง mm"
-                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#a99784]">สูงสุด/แถว (Cols)</label>
-                  <FreeNumberInput
-                    min={1}
-                    max={12}
-                    step={1}
-                    value={gridColumns}
-                    onChangeNumber={setGridColumns}
-                    aria-label="จำนวนดวงต่อแถวสูงสุด"
-                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#a99784]">ช่องไฟ (Gap mm)</label>
-                  <FreeNumberInput
-                    min={0}
-                    max={20}
-                    allowDecimal
-                    step={0.5}
-                    value={gridGapMm}
-                    onChangeNumber={setGridGapMm}
-                    aria-label="ช่องไฟระหว่างสติกเกอร์ mm"
-                    className="w-full px-2 py-1 rounded bg-[#1a130e] border border-[#443326] font-mono text-xs text-[#faf5ee]"
-                  />
-                </div>
+        {/* 3. พิมพ์สติกเกอร์ (1 แผ่นต่อการกด) */}
+        <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 sm:p-6 space-y-4 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#3a2a1f] pb-3">
+            <div>
+              <div className="text-base sm:text-lg font-bold text-[#f7f1e8] flex items-center gap-2">
+                <Printer className="w-5 h-5 text-[#e8c170]" />
+                <span>3. สั่งพิมพ์สติกเกอร์ (1 แผ่นตรงตามขนาดกระดาษ)</span>
               </div>
-              <div className="text-[10px] text-emerald-300/90 font-mono">
-                จัดเรียงได้ {gridFitStats.cols} × {gridFitStats.rowsPerPage} = {gridFitStats.perPage} ดวง/แผ่น
-              </div>
+              <p className="text-xs sm:text-sm text-[#a99784] mt-0.5">
+                พิมพ์สติกเกอร์เดี่ยว 1 แผ่นตรงขนาด 30×40mm พอดี (หากต้องการหลายชุด สามารถใส่ตัวเลขจำนวนชุดในหน้าต่างเครื่องพิมพ์ได้โดยตรง)
+              </p>
             </div>
-          )}
+          </div>
 
-          {/* Copies Count & Print Button */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {BATCH_PRESETS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setCopies(n)}
-                  className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-mono font-bold transition-all ${
-                    copies === n
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] shadow-md scale-105'
-                      : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
-                  }`}
-                >
-                  {n.toLocaleString()}
-                </button>
-              ))}
-              <FreeNumberInput
-                min={1}
-                max={2000}
-                step={1}
-                value={copies}
-                onChangeNumber={setCopies}
-                aria-label="จำนวนดวงที่ต้องการพิมพ์"
-                className="w-24 px-3 py-1.5 sm:py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs sm:text-sm font-mono font-bold text-[#faf5ee]"
-              />
-            </div>
-
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <button
               type="button"
               onClick={handlePrintStickers}
-              className="flex items-center gap-2 px-6 py-3 xl:py-4 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm sm:text-base font-bold shadow-xl transition-transform active:scale-95"
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-base sm:text-lg font-black shadow-2xl transition-transform active:scale-95"
             >
-              <Printer className="w-5 h-5" />
-              <span>พิมพ์สติกเกอร์ {copies.toLocaleString()} ดวง & บันทึกลง Sheet</span>
+              <Printer className="w-6 h-6" />
+              <span>พิมพ์สติกเกอร์ 1 ดวง (ขนาด 30×40mm)</span>
             </button>
           </div>
         </div>

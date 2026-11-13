@@ -891,7 +891,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
       </div>
 
       {/* Print-only Calibrated Batch Container (1:1 Physical Margins & Offset) */}
-      {activeBatchCopies > 0 && (
+      {studioTab !== 'sticker' && activeBatchCopies > 0 && (
         <div id="printable-batch-root" className="hidden print:block">
           {Array.from({ length: activeBatchCopies }, (_, idx) => {
             const copyReceiptNo =

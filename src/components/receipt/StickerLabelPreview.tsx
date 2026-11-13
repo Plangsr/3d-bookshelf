@@ -104,12 +104,12 @@ function computeStickerMetrics(
 
   // For label printers like Xprinter XP-490B (203 DPI, 26mm - 108mm print width),
   // boost font scale so text fills the label boldly and cleanly
-  const widthBudgetMm = effW * (isCompact ? 0.105 : 0.115);
-  const heightBudgetMm = (effH * 0.98) / Math.max(3.8, emDemand);
-  const userScale = Math.max(0.45, Math.min(4.0, (config.fontScalePct ?? 100) / 100));
+  const widthBudgetMm = effW * (isCompact ? 0.145 : 0.160);
+  const heightBudgetMm = (effH * 0.98) / Math.max(3.2, emDemand);
+  const userScale = Math.max(0.45, Math.min(5.0, (config.fontScalePct ?? 100) / 100));
 
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(1.1, Math.min(18.0, rawFontMm));
+  const baseFontMm = Math.max(1.5, Math.min(22.0, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
