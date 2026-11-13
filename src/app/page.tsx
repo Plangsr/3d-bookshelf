@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ClothingRackCanvas } from '@/components/3d/ClothingRackCanvas';
+import { LandingPrintStudio } from '@/components/receipt/LandingPrintStudio';
 import { ReceiptPreview } from '@/components/receipt/ReceiptPreview';
 import {
   applyDynamicPrintPageStyle,
@@ -70,7 +71,8 @@ export default function Home() {
     createInitialDraft(DEFAULT_SHOP_PROFILE, INITIAL_PAPER_SIZES[1]?.id ?? INITIAL_PAPER_SIZES[0].id)
   );
 
-  // Modal visibility state
+  // Modal & primary view visibility state
+  const [activeView, setActiveView] = useState<'studio' | 'rack'>('studio');
   const [isShirtStudioOpen, setIsShirtStudioOpen] = useState(false);
   const [editingShirt, setEditingShirt] = useState<Shirt | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -506,25 +508,66 @@ export default function Home() {
 
   return (
     <>
-      <main className="relative w-screen h-screen overflow-hidden bg-[#0c0907] print:hidden">
-        {/* 3D Boutique Clothing Rack Scene */}
-        <ClothingRackCanvas
-          shirts={shirts}
-          receiptItemCount={receiptItemCount}
-          receiptTotal={draftTotals.grandTotal}
-          onOpenStudio={() => {
-            setEditingShirt(null);
-            setIsShirtStudioOpen(true);
-          }}
-          onEditShirt={(shirt) => {
-            setEditingShirt(shirt);
-            setIsShirtStudioOpen(true);
-          }}
-          onOpenReceipt={() => setIsReceiptModalOpen(true)}
-          onOpenSizeManager={() => setIsSizeManagerOpen(true)}
-          onAddToReceipt={handleAddToReceipt}
-          onDeleteShirt={(shirtId) => void handleDeleteShirt(shirtId)}
-        />
+      <main
+        className={`relative w-screen h-screen bg-[#0c0907] print:hidden ${
+          activeView === 'studio' ? 'overflow-y-auto' : 'overflow-hidden'
+        }`}
+      >
+        {/* Top View Switcher */}
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 rounded-full border border-[#4a3728] bg-[#17110d]/95 p-1 shadow-xl backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setActiveView('studio')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              activeView === 'studio'
+                ? 'bg-[#e8c170] text-[#1c1410] font-bold'
+                : 'text-[#d6c8b6] hover:text-white'
+            }`}
+          >
+            อัปโหลด &amp; พิมพ์ใบเสร็จ
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('rack')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              activeView === 'rack'
+                ? 'bg-[#e8c170] text-[#1c1410] font-bold'
+                : 'text-[#d6c8b6] hover:text-white'
+            }`}
+          >
+            ราวแขวนเสื้อ 3D
+          </button>
+        </div>
+
+        {activeView === 'studio' ? (
+          <LandingPrintStudio
+            shirts={shirts}
+            paperSizes={paperSizes}
+            shopProfile={shopProfile}
+            draft={draft}
+            onUpdateDraft={handleUpdateDraft}
+            onOpenSizeManager={() => setIsSizeManagerOpen(true)}
+            onSwitchTo3DRack={() => setActiveView('rack')}
+          />
+        ) : (
+          <ClothingRackCanvas
+            shirts={shirts}
+            receiptItemCount={receiptItemCount}
+            receiptTotal={draftTotals.grandTotal}
+            onOpenStudio={() => {
+              setEditingShirt(null);
+              setIsShirtStudioOpen(true);
+            }}
+            onEditShirt={(shirt) => {
+              setEditingShirt(shirt);
+              setIsShirtStudioOpen(true);
+            }}
+            onOpenReceipt={() => setIsReceiptModalOpen(true)}
+            onOpenSizeManager={() => setIsSizeManagerOpen(true)}
+            onAddToReceipt={handleAddToReceipt}
+            onDeleteShirt={(shirtId) => void handleDeleteShirt(shirtId)}
+          />
+        )}
 
         {/* Shirt Studio Modal (Add / Edit Shirt + Sizes + AI Tag Scan) */}
         <ShirtStudioModal

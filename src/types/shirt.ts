@@ -119,3 +119,24 @@ export type ReceiptDraft = Omit<ReceiptRecord, 'id' | 'issuedAt'> & {
   id?: string;
   issuedAt?: string;
 };
+
+export interface PrintSet {
+  id: string;
+  name: string;
+  templateType: ReceiptTemplateType;
+  paperSizeId: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  customerTaxId: string;
+  paymentMethod: PaymentMethod;
+  items: ReceiptLineItem[];
+  discountAmount: number;
+  shippingFee: number;
+  vatMode: VatMode;
+  hidePricesOnSlip?: boolean;
+  includeSlipOnPrint?: boolean;
+  notes: string;
+  defaultCopies: number;
+  updatedAt: string;
+}

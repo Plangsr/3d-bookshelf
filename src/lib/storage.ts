@@ -4,6 +4,7 @@ import {
   INITIAL_SHIRTS,
 } from '@/data/shirts';
 import type {
+  PrintSet,
   ReceiptLineItem,
   ReceiptPaperSize,
   ReceiptRecord,
@@ -18,6 +19,7 @@ const STORAGE_KEYS = {
   paperSizes: 'atelier_paper_sizes_v1',
   shopProfile: 'atelier_shop_profile_v1',
   receiptHistory: 'atelier_receipt_history_v1',
+  printSets: 'atelier_print_sets_v1',
   receiptDraft: 'atelier_receipt_draft_v1',
 } as const;
 
@@ -147,6 +149,18 @@ export function loadReceiptDraft(): Partial<ReceiptRecord> | null {
 
 export function saveReceiptDraft(draft: Partial<ReceiptRecord>): void {
   writeStorageJson(STORAGE_KEYS.receiptDraft, draft);
+}
+
+export function loadPrintSets(): PrintSet[] {
+  const parsed = readStorageJson(STORAGE_KEYS.printSets);
+  if (Array.isArray(parsed)) {
+    return parsed as PrintSet[];
+  }
+  return [];
+}
+
+export function savePrintSets(sets: PrintSet[]): void {
+  writeStorageJson(STORAGE_KEYS.printSets, sets);
 }
 
 /**
