@@ -115,6 +115,60 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   const [activeBatchCopies, setActiveBatchCopies] = useState<number>(0);
   const [statusText, setStatusText] = useState<string>('');
 
+  // 1. Fetch presets & latest stickers from Google Sheets on mount so multiple devices sync seamlessly
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchCrossDevicePresets = async () => {
+      try {
+        const res = await fetch('/api/stickers/presets');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && Array.isArray(data.presets) && data.presets.length > 0) {
+          if (isCancelled) return;
+          const remotePresets = data.presets as StickerSet[];
+          setStickerSets((prev) => {
+            // Merge remote presets with local presets (remote takes precedence by id)
+            const map = new Map<string, StickerSet>();
+            for (const p of prev) map.set(p.id, p);
+            for (const r of remotePresets) map.set(r.id, r);
+            const merged = Array.from(map.values());
+            saveStickerSets(merged);
+            return merged;
+          });
+
+          // Automatically select the most recently updated preset so all devices mirror the active sticker
+          const latestPreset = remotePresets[0];
+          if (latestPreset) {
+            setSelectedSetId(latestPreset.id);
+            setSetNameInput(latestPreset.name);
+            setConfig({
+              ...latestPreset.config,
+              showBrandHeader: false,
+            });
+            if (latestPreset.calibration) {
+              setCalibration({
+                ...latestPreset.calibration,
+              });
+            }
+            if (latestPreset.defaultCopies) {
+              setCopies(latestPreset.defaultCopies);
+            }
+            if (latestPreset.paperSizeId) {
+              setSelectedPaperSizeId(latestPreset.paperSizeId);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Unable to sync presets from Google Sheets on mount:', err);
+      }
+    };
+
+    void fetchCrossDevicePresets();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const onAfterPrint = () => setActiveBatchCopies(0);
     window.addEventListener('afterprint', onAfterPrint);
@@ -183,28 +237,35 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     setSetNameInput(newSet.name);
     setStatusText(`บันทึก Preset สติกเกอร์ "${newSet.name}" เรียบร้อยแล้ว`);
 
-    // Sync to Google Sheets automatically
+    // Sync to Google Sheets automatically (both to Preset tab and Stickers history)
     void (async () => {
       try {
-        await fetch('/api/stickers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: newSet.id,
-            modelName: config.modelName,
-            colorName: config.colorName,
-            sizeLabel: config.sizeLabel,
-            showBarcode: config.showBarcode,
-            barcodeDigits: config.barcodeDigits,
-            barcodeCaption: config.barcodeCaption,
-            paperWidthMm: calibration.paperWidthMm,
-            paperHeightMm: calibration.paperHeightMm,
-            copies: Math.max(1, copies),
-            fontScalePct: config.fontScalePct ?? 100,
-            presetName: newSet.name,
-            createdAt: newSet.updatedAt,
+        await Promise.allSettled([
+          fetch('/api/stickers/presets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSet),
           }),
-        });
+          fetch('/api/stickers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: newSet.id,
+              modelName: config.modelName,
+              colorName: config.colorName,
+              sizeLabel: config.sizeLabel,
+              showBarcode: config.showBarcode,
+              barcodeDigits: config.barcodeDigits,
+              barcodeCaption: config.barcodeCaption,
+              paperWidthMm: calibration.paperWidthMm,
+              paperHeightMm: calibration.paperHeightMm,
+              copies: Math.max(1, copies),
+              fontScalePct: config.fontScalePct ?? 100,
+              presetName: newSet.name,
+              createdAt: newSet.updatedAt,
+            }),
+          }),
+        ]);
         setStatusText(`บันทึก Preset "${newSet.name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
       } catch (err) {
         console.warn('Google Sheets sync error:', err);
@@ -232,28 +293,38 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     saveStickerSets(next);
     setStatusText(`อัปเดต Preset สติกเกอร์ "${name}" แล้ว`);
 
-    // Sync updated preset to Google Sheets
+    // Sync updated preset to Google Sheets (both to Preset tab and Stickers log)
+    const updatedItem = next.find((s) => s.id === selectedSetId);
     void (async () => {
       try {
-        await fetch('/api/stickers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: selectedSetId,
-            modelName: config.modelName,
-            colorName: config.colorName,
-            sizeLabel: config.sizeLabel,
-            showBarcode: config.showBarcode,
-            barcodeDigits: config.barcodeDigits,
-            barcodeCaption: config.barcodeCaption,
-            paperWidthMm: calibration.paperWidthMm,
-            paperHeightMm: calibration.paperHeightMm,
-            copies: Math.max(1, copies),
-            fontScalePct: config.fontScalePct ?? 100,
-            presetName: name,
-            createdAt: new Date().toISOString(),
+        await Promise.allSettled([
+          updatedItem
+            ? fetch('/api/stickers/presets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedItem),
+              })
+            : Promise.resolve(),
+          fetch('/api/stickers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: selectedSetId,
+              modelName: config.modelName,
+              colorName: config.colorName,
+              sizeLabel: config.sizeLabel,
+              showBarcode: config.showBarcode,
+              barcodeDigits: config.barcodeDigits,
+              barcodeCaption: config.barcodeCaption,
+              paperWidthMm: calibration.paperWidthMm,
+              paperHeightMm: calibration.paperHeightMm,
+              copies: Math.max(1, copies),
+              fontScalePct: config.fontScalePct ?? 100,
+              presetName: name,
+              createdAt: new Date().toISOString(),
+            }),
           }),
-        });
+        ]);
         setStatusText(`อัปเดต Preset "${name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
       } catch (err) {
         console.warn('Google Sheets sync error:', err);
@@ -283,9 +354,14 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
 
     void (async () => {
       try {
-        await fetch(`/api/stickers?id=${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        });
+        await Promise.allSettled([
+          fetch(`/api/stickers/presets?id=${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+          }),
+          fetch(`/api/stickers?id=${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+          }),
+        ]);
       } catch (err) {
         console.warn('Google Sheets delete error:', err);
       }
@@ -378,12 +454,12 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
         )}
 
-        {/* 1. Sticker Content: รุ่น / สี / ไซส์ (Clean Large UI) */}
-        <div className="rounded-2xl border border-[#4a3628] bg-[#1a130e] p-5 sm:p-6 space-y-5">
+        {/* 1. Sticker Content: รุ่น / สี / ไซส์ (Clean Large UI, Scales with Screen) */}
+        <div className="rounded-2xl border border-[#4a3628] bg-[#1a130e] p-5 sm:p-6 xl:p-8 space-y-5 xl:space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#3a2a1f] pb-3">
             <div className="flex items-center gap-2.5">
-              <Tag className="w-5 h-5 text-[#e8c170]" />
-              <div className="text-base font-bold text-[#f7f1e8]">
+              <Tag className="w-5 h-5 xl:w-6 xl:h-6 text-[#e8c170]" />
+              <div className="text-base sm:text-lg xl:text-xl font-bold text-[#f7f1e8]">
                 ข้อมูลสติกเกอร์ (รุ่น • สี • ไซส์)
               </div>
             </div>
@@ -398,24 +474,24 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   barcodeCaption: '',
                 })
               }
-              className="px-3 py-1.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170] flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs xl:text-sm font-semibold text-[#e8c170] flex items-center gap-1.5 transition-colors"
             >
-              <Eraser className="w-4 h-4" />
+              <Eraser className="w-4 h-4 xl:w-5 xl:h-5" />
               <span>เว้นว่างทั้งหมด (ไว้เขียนมือ)</span>
             </button>
           </div>
 
           {/* รุ่น (Model) */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-[#f5efe6]">
+              <label className="text-sm sm:text-base xl:text-lg font-bold text-[#f5efe6]">
                 รุ่น (MODEL)
               </label>
               {config.modelName && (
                 <button
                   type="button"
                   onClick={() => patchConfig({ modelName: '' })}
-                  className="text-xs text-[#e8c170] hover:underline"
+                  className="text-xs sm:text-sm text-[#e8c170] hover:underline"
                 >
                   เว้นว่างไว้เขียนเอง
                 </button>
@@ -426,21 +502,21 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               value={config.modelName}
               onChange={(e) => patchConfig({ modelName: e.target.value })}
               placeholder="พิมพ์ชื่อรุ่น เช่น 1103 หรือปล่อยว่างเพื่อขีดเส้นเขียน"
-              className="w-full px-4 py-3 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
+              className="w-full px-4 py-3 xl:py-4 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base sm:text-lg xl:text-xl font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
             />
           </div>
 
           {/* สี (Color) */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-[#f5efe6]">
+              <label className="text-sm sm:text-base xl:text-lg font-bold text-[#f5efe6]">
                 สี (COLOR)
               </label>
               {config.colorName && (
                 <button
                   type="button"
                   onClick={() => patchConfig({ colorName: '' })}
-                  className="text-xs text-[#e8c170] hover:underline"
+                  className="text-xs sm:text-sm text-[#e8c170] hover:underline"
                 >
                   เว้นว่างไว้เขียนเอง
                 </button>
@@ -451,7 +527,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               value={config.colorName}
               onChange={(e) => patchConfig({ colorName: e.target.value })}
               placeholder="พิมพ์ชื่อสี หรือเลือกปุ่มด้านล่าง"
-              className="w-full px-4 py-3 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
+              className="w-full px-4 py-3 xl:py-4 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base sm:text-lg xl:text-xl font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
             />
             <div className="flex flex-wrap gap-2 pt-1">
               {QUICK_COLOR_CHIPS.map((c) => (
@@ -459,7 +535,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   key={c}
                   type="button"
                   onClick={() => patchConfig({ colorName: c })}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border text-xs sm:text-sm xl:text-base font-semibold transition-all ${
                     config.colorName === c
                       ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold shadow-md scale-105'
                       : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
@@ -472,26 +548,26 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
 
           {/* ไซส์ (Size) */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-[#f5efe6]">
+              <label className="text-sm sm:text-base xl:text-lg font-bold text-[#f5efe6]">
                 ไซส์ (SIZE)
               </label>
               <button
                 type="button"
                 onClick={() => patchConfig({ sizeLabel: '' })}
-                className="text-xs text-[#e8c170] hover:underline"
+                className="text-xs sm:text-sm text-[#e8c170] hover:underline"
               >
                 เว้นว่างไว้เขียนเอง
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               {QUICK_SIZE_CHIPS.map((sz) => (
                 <button
                   key={sz}
                   type="button"
                   onClick={() => patchConfig({ sizeLabel: sz })}
-                  className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all ${
+                  className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl border text-sm sm:text-base xl:text-lg font-bold transition-all ${
                     config.sizeLabel === sz
                       ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] scale-105 shadow-md'
                       : 'bg-[#120d0a] text-[#cfc2b2] border-[#3b2c21] hover:border-[#6a503b]'
@@ -505,7 +581,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 value={config.sizeLabel}
                 onChange={(e) => patchConfig({ sizeLabel: e.target.value })}
                 placeholder="พิมพ์ไซส์เอง"
-                className="w-32 px-3.5 py-2 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm font-bold text-[#ffffff] placeholder:text-[#786656] text-center"
+                className="w-32 sm:w-36 px-3.5 py-2 sm:py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm sm:text-base xl:text-lg font-bold text-[#ffffff] placeholder:text-[#786656] text-center"
               />
             </div>
           </div>
@@ -513,12 +589,12 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           {/* Barcode Option */}
           <div className="pt-3 border-t border-[#3a2a1f] space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <label className="flex items-center gap-2.5 text-sm font-medium text-[#f5efe6] cursor-pointer">
+              <label className="flex items-center gap-2.5 text-sm sm:text-base font-medium text-[#f5efe6] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={config.showBarcode}
                   onChange={(e) => patchConfig({ showBarcode: e.target.checked })}
-                  className="w-4 h-4 rounded accent-[#e8c170]"
+                  className="w-4 h-4 xl:w-5 xl:h-5 rounded accent-[#e8c170]"
                 />
                 <span>แสดงแถบบาร์โค้ด</span>
               </label>
@@ -526,7 +602,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => patchConfig({ barcodeDigits: '', barcodeCaption: '' })}
-                  className="text-xs text-[#e8c170] hover:underline"
+                  className="text-xs sm:text-sm text-[#e8c170] hover:underline"
                 >
                   เว้นว่างไว้เขียนเอง
                 </button>
@@ -539,14 +615,14 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   value={config.barcodeDigits}
                   onChange={(e) => patchConfig({ barcodeDigits: e.target.value })}
                   placeholder="เลขบาร์โค้ด เช่น 8 851234 567890"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] font-mono text-sm text-[#faf5ee]"
+                  className="w-full px-3.5 py-2.5 xl:py-3.5 rounded-xl bg-[#120d0a] border border-[#523d2e] font-mono text-sm sm:text-base text-[#faf5ee]"
                 />
                 <input
                   type="text"
                   value={config.barcodeCaption}
                   onChange={(e) => patchConfig({ barcodeCaption: e.target.value })}
                   placeholder="รหัสข้อความกำกับ เช่น 1103-XL"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm text-[#faf5ee]"
+                  className="w-full px-3.5 py-2.5 xl:py-3.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm sm:text-base text-[#faf5ee]"
                 />
               </div>
             )}
@@ -554,7 +630,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
 
           {/* Text Scaling Slider */}
           <div className="pt-3 border-t border-[#3a2a1f] flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs font-semibold text-[#d6c8b6]">
+            <div className="text-xs sm:text-sm xl:text-base font-semibold text-[#d6c8b6]">
               ขยายขนาดตัวอักษรบนสติกเกอร์
             </div>
             <div className="flex items-center gap-2.5">
@@ -565,9 +641,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 step={5}
                 value={config.fontScalePct ?? 100}
                 onChange={(e) => patchConfig({ fontScalePct: Number(e.target.value) || 100 })}
-                className="w-36 sm:w-48 accent-[#e8c170]"
+                className="w-36 sm:w-52 accent-[#e8c170]"
               />
-              <span className="font-mono text-xs font-bold text-[#e8c170] w-12 text-right">
+              <span className="font-mono text-xs sm:text-sm xl:text-base font-bold text-[#e8c170] w-12 sm:w-16 text-right">
                 {config.fontScalePct ?? 100}%
               </span>
             </div>
@@ -575,60 +651,60 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
         </div>
 
         {/* 2. บันทึก Preset สติกเกอร์ (ขนาดกระดาษ + ข้อมูลที่กรอก รวมเป็น Preset เดียวกัน) */}
-        <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 space-y-3 shadow-lg">
+        <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 sm:p-6 xl:p-7 space-y-3.5 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-base font-bold text-[#f7f1e8] flex items-center gap-2">
-                <BookmarkPlus className="w-5 h-5 text-[#e8c170]" />
+              <div className="text-base sm:text-lg xl:text-xl font-bold text-[#f7f1e8] flex items-center gap-2">
+                <BookmarkPlus className="w-5 h-5 xl:w-6 xl:h-6 text-[#e8c170]" />
                 <span>2. บันทึก Preset (ขนาดกระดาษ + ข้อมูลสติกเกอร์)</span>
               </div>
-              <p className="text-xs text-[#a99784] mt-0.5">
-                บันทึกทั้งขนาดกระดาษ ระยะขอบ และข้อมูลรุ่น/สี/ไซส์ รวมไว้ใน Preset เดียวกัน กดครั้งเดียวโหลดได้ครบ
+              <p className="text-xs sm:text-sm text-[#a99784] mt-0.5">
+                บันทึกทั้งขนาดกระดาษ ระยะขอบ และข้อมูลรุ่น/สี/ไซส์ รวมไว้ใน Preset เดียวกัน และซิงก์ข้ามเครื่องผ่าน Google Sheet
               </p>
             </div>
-            <span className="text-xs font-mono text-[#e8c170] bg-[#291e16] px-2.5 py-1 rounded-lg border border-[#543e2d]">
-              {stickerSets.length} Preset ในเครื่อง
+            <span className="text-xs sm:text-sm font-mono text-[#e8c170] bg-[#291e16] px-3 py-1.5 rounded-lg border border-[#543e2d]">
+              {stickerSets.length} Preset ในระบบ
             </span>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-2.5 pt-1">
             <input
               type="text"
               value={setNameInput}
               onChange={(e) => setSetNameInput(e.target.value)}
               placeholder="ตั้งชื่อ Preset เช่น สติกเกอร์ 50x70 รุ่น 1103 สีกรมท่า"
-              className="flex-1 min-w-[220px] px-4 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm text-[#ffffff] font-medium placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none"
+              className="flex-1 min-w-[220px] px-4 py-2.5 xl:py-3.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm sm:text-base text-[#ffffff] font-medium placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none"
             />
             <button
               type="button"
               onClick={handleCreateSet}
-              className="px-4 py-2.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm font-bold flex items-center gap-1.5 shadow transition-transform active:scale-95"
+              className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm sm:text-base font-bold flex items-center gap-1.5 shadow transition-transform active:scale-95"
             >
-              <FolderPlus className="w-4 h-4" />
+              <FolderPlus className="w-4 h-4 xl:w-5 xl:h-5" />
               <span>บันทึกเป็น Preset ใหม่</span>
             </button>
             {selectedSetId && (
               <button
                 type="button"
                 onClick={handleUpdateSet}
-                className="px-4 py-2.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[#f5da98] text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[#f5da98] text-sm sm:text-base font-semibold flex items-center gap-1.5 transition-colors"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-4 h-4 xl:w-5 xl:h-5" />
                 <span>บันทึกทับ Preset เดิม</span>
               </button>
             )}
           </div>
 
           {stickerSets.length > 0 && (
-            <div className="space-y-1.5 pt-2 border-t border-[#3a2a1f]">
-              <div className="text-xs font-semibold text-[#c8b7a4]">
-                เลือก Preset ที่บันทึกไว้:
+            <div className="space-y-2 pt-2 border-t border-[#3a2a1f]">
+              <div className="text-xs sm:text-sm font-semibold text-[#c8b7a4]">
+                เลือก Preset ที่บันทึกไว้ (ใช้งานร่วมกันได้ทุกเครื่อง):
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 sm:gap-2.5">
                 {stickerSets.map((s) => (
                   <div
                     key={s.id}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all ${
+                    className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs sm:text-sm transition-all ${
                       selectedSetId === s.id
                         ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f7e1a8] font-bold shadow-md scale-102'
                         : 'bg-[#120d0a] border-[#3b2c21] text-[#d6c8b6] hover:border-[#6a503b]'
@@ -640,7 +716,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                       className="hover:underline flex items-center gap-1.5 text-left"
                     >
                       <span>{s.name}</span>
-                      <span className="text-[10px] opacity-75 font-mono">
+                      <span className="text-[11px] sm:text-xs opacity-75 font-mono">
                         ({s.calibration?.paperWidthMm}×{s.calibration?.paperHeightMm ?? 'Auto'}mm)
                       </span>
                     </button>
@@ -650,7 +726,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                       className="text-red-300/70 hover:text-red-300 p-0.5 rounded hover:bg-red-950/30 transition-colors"
                       title="ลบ Preset นี้"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                   </div>
                 ))}
@@ -677,7 +753,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
 
           {/* Quick Sticker Size Chips */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {STICKER_QUICK_SIZES.map((qs) => (
               <button
                 key={qs.label}
@@ -685,9 +761,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 onClick={() =>
                   handleApplyStickerQuickSize(qs.w, qs.h, qs.m, qs.w === 210)
                 }
-                className={`px-2.5 py-1 rounded-lg border text-[11px] ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all ${
                   calibration.paperWidthMm === qs.w && calibration.paperHeightMm === qs.h
-                    ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
+                    ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold shadow-md scale-102'
                     : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
                 }`}
               >
@@ -697,14 +773,14 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
 
           {/* Single Roll vs Multi-Up Grid Toggle */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <button
               type="button"
               onClick={() => setPrintLayoutMode('single')}
-              className={`px-3 py-1.5 rounded-lg border text-xs ${
+              className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
                 printLayoutMode === 'single'
-                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98] font-bold'
-                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2]'
+                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98]'
+                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2] hover:border-[#6a503b]'
               }`}
             >
               เครื่องพิมพ์สติกเกอร์ (1 ดวง/แผ่น)
@@ -712,13 +788,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             <button
               type="button"
               onClick={() => setPrintLayoutMode('grid')}
-              className={`px-3 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all ${
                 printLayoutMode === 'grid'
-                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98] font-bold'
-                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2]'
+                  ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f5da98]'
+                  : 'bg-[#120d0a] border-[#3b2c21] text-[#cfc2b2] hover:border-[#6a503b]'
               }`}
             >
-              <Grid className="w-3.5 h-3.5" />
+              <Grid className="w-4 h-4" />
               <span>เรียงหลายดวงในแผ่น A4/A5</span>
             </button>
           </div>
@@ -785,17 +861,17 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           )}
 
           {/* Copies Count & Print Button */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2">
               {BATCH_PRESETS.map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setCopies(n)}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-mono ${
+                  className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-mono font-bold transition-all ${
                     copies === n
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold'
-                      : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21]'
+                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] shadow-md scale-105'
+                      : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
                   }`}
                 >
                   {n.toLocaleString()}
@@ -808,16 +884,16 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 value={copies}
                 onChangeNumber={setCopies}
                 aria-label="จำนวนดวงที่ต้องการพิมพ์"
-                className="w-20 px-2.5 py-1 rounded-lg bg-[#120d0a] border border-[#443326] text-xs font-mono text-[#faf5ee]"
+                className="w-24 px-3 py-1.5 sm:py-2 rounded-xl bg-[#120d0a] border border-[#443326] text-xs sm:text-sm font-mono font-bold text-[#faf5ee]"
               />
             </div>
 
             <button
               type="button"
               onClick={handlePrintStickers}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-xs font-bold shadow-lg transition-transform active:scale-95"
+              className="flex items-center gap-2 px-6 py-3 xl:py-4 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm sm:text-base font-bold shadow-xl transition-transform active:scale-95"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-5 h-5" />
               <span>พิมพ์สติกเกอร์ {copies.toLocaleString()} ดวง & บันทึกลง Sheet</span>
             </button>
           </div>

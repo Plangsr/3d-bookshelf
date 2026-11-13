@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlignCenter, BookmarkPlus, Move, RotateCcw } from 'lucide-react';
 import type { PrintLayoutCalibration, ReceiptPaperSize } from '@/types/shirt';
 import { FreeNumberInput } from './FreeNumberInput';
@@ -24,9 +24,6 @@ interface PrintPositionMapProps {
   children?: React.ReactNode;
 }
 
-const PREVIEW_PAPER_MAX_WIDTH_PX = 310;
-const PREVIEW_PAPER_MAX_HEIGHT_PX = 430;
-
 export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
   paperSizes,
   selectedPaperSizeId,
@@ -41,6 +38,32 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
 }) => {
   const [presetName, setPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const previewMaxW = useMemo(() => {
+    if (viewportWidth >= 1920) return 560;
+    if (viewportWidth >= 1536) return 480;
+    if (viewportWidth >= 1280) return 420;
+    if (viewportWidth >= 1024) return 360;
+    return 320;
+  }, [viewportWidth]);
+
+  const previewMaxH = useMemo(() => {
+    if (viewportWidth >= 1920) return 720;
+    if (viewportWidth >= 1536) return 640;
+    if (viewportWidth >= 1280) return 560;
+    if (viewportWidth >= 1024) return 480;
+    return 420;
+  }, [viewportWidth]);
+
   const [dragMode, setDragMode] = useState<
     'none' | 'move' | 'resize-e' | 'resize-w' | 'resize-s' | 'resize-n' | 'resize-se'
   >('none');
@@ -74,12 +97,12 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
       ? Math.max(80, Math.round(effWidthMm * 1.65))
       : Math.max(5, isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm);
 
-  // Convert mm -> screen px so paper sheet fits neatly with exact physical aspect ratio
+  // Convert mm -> screen px so paper sheet fits neatly with exact physical aspect ratio, responsive to screen
   const pxPerMm = useMemo(() => {
-    const scaleX = PREVIEW_PAPER_MAX_WIDTH_PX / effWidthMm;
-    const scaleY = PREVIEW_PAPER_MAX_HEIGHT_PX / effHeightMm;
-    return Math.min(scaleX, scaleY, 8.5);
-  }, [effWidthMm, effHeightMm]);
+    const scaleX = previewMaxW / effWidthMm;
+    const scaleY = previewMaxH / effHeightMm;
+    return Math.min(scaleX, scaleY, 12);
+  }, [effWidthMm, effHeightMm, previewMaxW, previewMaxH]);
 
   const sheetPxW = effWidthMm * pxPerMm;
   const sheetPxH = effHeightMm * pxPerMm;
