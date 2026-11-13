@@ -241,7 +241,10 @@ export function formatColorDisplayName(rawColor: string): string {
   return COLOR_HEX_TO_THAI[key] || rawColor;
 }
 
-export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): void {
+export function applyFreePrintPageStyle(
+  calibration: PrintLayoutCalibration,
+  totalRollHeightMm?: number
+): void {
   if (typeof document === 'undefined') return;
   const styleId = 'dynamic-print-page-style';
   let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
@@ -258,7 +261,9 @@ export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): vo
       : calibration.paperWidthMm;
   const height =
     calibration.paperHeightMm === null
-      ? 'auto'
+      ? totalRollHeightMm && totalRollHeightMm > 0
+        ? `${totalRollHeightMm}mm`
+        : 'auto'
       : `${isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm}mm`;
   // Set exact @page size and 0mm margin so thermal printer page break matches the physical label
   styleEl.textContent = `

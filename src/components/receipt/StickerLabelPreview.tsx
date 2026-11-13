@@ -83,18 +83,18 @@ function computeStickerMetrics(
   const colorChars = config.colorName.trim().length;
   const captionChars = config.barcodeCaption.trim().length;
 
-  const modelLines = modelChars > 18 ? 1.85 : 1.0;
-  const colorLines = colorChars > 18 ? 1.75 : 1.0;
+  const modelLines = modelChars > 8 ? 1.8 : 1.05;
+  const colorLines = colorChars > 8 ? 1.7 : 1.05;
 
-  let emDemand = isCompact ? 0.75 : 1.3; // outer top+bottom padding
+  let emDemand = isCompact ? 0.9 : 1.4; // outer top+bottom padding
   if (config.showBrandHeader) {
     const hasBrandSub = config.brandHeader.trim().includes(' ');
     emDemand += isCompact ? (hasBrandSub ? 2.15 : 1.65) : hasBrandSub ? 2.9 : 2.2;
   }
-  emDemand += (isCompact ? 0.62 : 0.78) + modelLines * (isCompact ? 0.96 : 1.15);
-  emDemand += (isCompact ? 0.62 : 0.78) + colorLines * (isCompact ? 0.9 : 1.05);
-  emDemand += isCompact ? 2.15 : 2.85; // ไซส์
-  emDemand += isCompact ? 0.48 : 1.1; // spacing between fields
+  emDemand += modelLines * (isCompact ? 1.5 : 1.65);
+  emDemand += colorLines * (isCompact ? 1.4 : 1.55);
+  emDemand += isCompact ? 2.4 : 2.8; // SIZE
+  emDemand += isCompact ? 0.55 : 1.0; // spacing between fields
 
   if (config.showBarcode) {
     emDemand += isCompact ? 1.7 : 2.65;
@@ -103,13 +103,14 @@ function computeStickerMetrics(
   }
 
   // For label printers like Xprinter XP-490B (203 DPI, 26mm - 108mm print width),
-  // boost font scale so text fills the label boldly and cleanly
-  const widthBudgetMm = effW * (isCompact ? 0.170 : 0.185);
-  const heightBudgetMm = (effH * 0.98) / Math.max(2.6, emDemand);
+  // boost font scale so text fills the label boldly while never clipping vertically
+  const widthBudgetMm = effW * (isCompact ? 0.145 : 0.160);
+  const heightBudgetMm = (effH * 0.92) / Math.max(4.5, emDemand);
   const userScale = Math.max(0.45, Math.min(5.0, (config.fontScalePct ?? 100) / 100));
 
+  const maxSafeFontMm = (effH * 0.94) / Math.max(4.2, emDemand);
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(1.8, Math.min(26.0, rawFontMm));
+  const baseFontMm = Math.max(1.5, Math.min(22.0, maxSafeFontMm, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
@@ -162,14 +163,25 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
   const align = config.textAlign ?? 'left';
   const textAlignClass =
     align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left';
+  const flexJustifyClass =
+    align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+  const heightCss =
+    heightMm && heightMm > 0
+      ? pxPerMm && pxPerMm > 0
+        ? `${(heightMm * pxPerMm).toFixed(2)}px`
+        : `${heightMm}mm`
+      : undefined;
 
   return (
     <div
       style={{
         fontSize: fontSizeCss,
         borderRadius: radiusCss,
+        height: heightCss,
       }}
-      className={`w-full bg-white text-[#15181e] ${padClass} flex flex-col justify-between leading-[1.12] font-sans select-none ${
+      className={`w-full bg-white text-[#15181e] ${padClass} flex flex-col ${
+        config.showBarcode || config.showBrandHeader ? 'justify-between' : 'justify-center'
+      } overflow-hidden leading-[1.12] font-sans select-none ${
         config.showCutBorder ? 'border border-neutral-300' : ''
       }`}
     >
@@ -203,11 +215,11 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
       <div className={fieldGapClass}>
         {/* MODEL */}
         <div className={textAlignClass}>
-          <div className="flex items-baseline gap-1.5 flex-wrap">
+          <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               className={`${
                 metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight`}
+              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
             >
               MODEL:
             </span>
@@ -227,11 +239,11 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
 
         {/* COLOR */}
         <div className={textAlignClass}>
-          <div className="flex items-baseline gap-1.5 flex-wrap">
+          <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               className={`${
                 metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight`}
+              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
             >
               COLOR:
             </span>
@@ -251,11 +263,11 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
 
         {/* SIZE */}
         <div className={textAlignClass}>
-          <div className="flex items-baseline gap-1.5 flex-wrap">
+          <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               className={`${
                 metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
-              } font-black text-neutral-800 tracking-tight`}
+              } font-black text-neutral-800 tracking-tight whitespace-nowrap`}
             >
               SIZE:
             </span>

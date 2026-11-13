@@ -111,6 +111,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   }));
 
   const [copies, setCopies] = useState<number>(1);
+  const [rollCopies, setRollCopies] = useState<number>(5);
+  const [rollLabelHeightMm, setRollLabelHeightMm] = useState<number>(40);
+  const [rollGapMm, setRollGapMm] = useState<number>(0);
   const [printLayoutMode, setPrintLayoutMode] = useState<'single' | 'grid'>('single');
   const [gridColumns, setGridColumns] = useState<number>(6);
   const [gridGapMm, setGridGapMm] = useState<number>(3);
@@ -372,11 +375,25 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     })();
   };
 
+  const isRollMode = calibration.paperHeightMm === null;
+
   const handlePrintStickers = () => {
-    // 1 แผ่นตรงตามขนาดกระดาษสติกเกอร์เสมอ
-    applyFreePrintPageStyle(calibration);
-    setActiveBatchCopies(1);
-    setStatusText('กำลังพิมพ์สติกเกอร์ 1 แผ่น...');
+    const safeRollCopies = isRollMode
+      ? Math.min(200, Math.max(1, Math.floor(rollCopies) || 1))
+      : 1;
+    const safeRollLabelH = Math.max(10, rollLabelHeightMm || 40);
+    const safeRollGap = Math.max(0, rollGapMm || 0);
+    const totalRollHeightMm = isRollMode
+      ? safeRollCopies * safeRollLabelH + Math.max(0, safeRollCopies - 1) * safeRollGap
+      : undefined;
+
+    applyFreePrintPageStyle(calibration, totalRollHeightMm);
+    setActiveBatchCopies(safeRollCopies);
+    setStatusText(
+      isRollMode
+        ? `กำลังพิมพ์สติกเกอร์ต่อเนื่อง ${safeRollCopies} ดวง (โหมด Roll)...`
+        : 'กำลังพิมพ์สติกเกอร์ 1 แผ่น...'
+    );
 
     // บันทึกลง Google Sheet ประวัติการพิมพ์ด้วย
     void (async () => {
@@ -394,9 +411,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             barcodeCaption: config.barcodeCaption,
             paperWidthMm: calibration.paperWidthMm,
             paperHeightMm: calibration.paperHeightMm,
-            copies: 1,
+            copies: safeRollCopies,
             fontScalePct: config.fontScalePct ?? 100,
-            presetName: setNameInput.trim() || 'พิมพ์ทันที',
+            presetName: setNameInput.trim() || (isRollMode ? 'พิมพ์ Roll ต่อเนื่อง' : 'พิมพ์ทันที'),
             createdAt: new Date().toISOString(),
             notes: 'Printed',
           }),
@@ -801,19 +818,95 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           onApplyMappedPaperSize={handleSelectPaperPreset}
         />
 
-        {/* 3. พิมพ์สติกเกอร์ (1 แผ่นต่อการกด) */}
+        {/* 3. พิมพ์สติกเกอร์ (1 แผ่น หรือต่อเนื่องโหมด Roll) */}
         <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 sm:p-6 space-y-4 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#3a2a1f] pb-3">
             <div>
               <div className="text-base sm:text-lg font-bold text-[#f7f1e8] flex items-center gap-2">
                 <Printer className="w-5 h-5 text-[#e8c170]" />
-                <span>3. สั่งพิมพ์สติกเกอร์ (1 แผ่นตรงตามขนาดกระดาษ)</span>
+                <span>
+                  {isRollMode
+                    ? '3. สั่งพิมพ์สติกเกอร์ต่อเนื่อง (โหมด Roll)'
+                    : '3. สั่งพิมพ์สติกเกอร์ (1 แผ่นตรงตามขนาดกระดาษ)'}
+                </span>
               </div>
               <p className="text-xs sm:text-sm text-[#a99784] mt-0.5">
-                พิมพ์สติกเกอร์เดี่ยว 1 แผ่นตรงขนาด 30×40mm พอดี (หากต้องการหลายชุด สามารถใส่ตัวเลขจำนวนชุดในหน้าต่างเครื่องพิมพ์ได้โดยตรง)
+                {isRollMode
+                  ? `พิมพ์ต่อเนื่อง ${rollCopies} ดวง สูงดวงละ ${rollLabelHeightMm}mm ช่องว่าง ${rollGapMm}mm (หน้ากระดาษยาวรวม ${
+                      rollCopies * Math.max(10, rollLabelHeightMm) +
+                      Math.max(0, rollCopies - 1) * Math.max(0, rollGapMm)
+                    }mm)`
+                  : `พิมพ์สติกเกอร์เดี่ยว 1 แผ่นตรงขนาด ${calibration.paperWidthMm}×${calibration.paperHeightMm}mm พอดี (หากต้องการหลายชุด สามารถใส่ตัวเลขจำนวนชุดในหน้าต่างเครื่องพิมพ์ได้โดยตรง)`}
               </p>
             </div>
           </div>
+
+          {isRollMode && (
+            <div className="rounded-xl border border-[#e8c170]/30 bg-[#120d0a] p-3.5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[#e8c170]">
+                  จำนวนดวงต่อเนื่อง (Roll)
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[1, 3, 5, 10, 20, 50].map((presetQty) => (
+                    <button
+                      key={presetQty}
+                      type="button"
+                      onClick={() => setRollCopies(presetQty)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                        rollCopies === presetQty
+                          ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                          : 'bg-[#1c1410] text-[#d6c7b6] border-[#3a2a1f] hover:border-[#e8c170]/50'
+                      }`}
+                    >
+                      {presetQty}
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={rollCopies}
+                    onChange={(e) =>
+                      setRollCopies(Math.min(200, Math.max(1, Number(e.target.value) || 1)))
+                    }
+                    className="w-16 px-2 py-1 rounded-lg bg-[#1c1410] border border-[#3a2a1f] text-xs font-bold text-[#f7f1e8] text-center focus:outline-none focus:border-[#e8c170]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[#2a1e17]">
+                <label className="flex items-center justify-between gap-2 text-xs text-[#cbbba9]">
+                  <span>สูงต่อดวง (mm)</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={200}
+                    step={1}
+                    value={rollLabelHeightMm}
+                    onChange={(e) =>
+                      setRollLabelHeightMm(Math.min(200, Math.max(10, Number(e.target.value) || 40)))
+                    }
+                    className="w-16 px-2 py-1 rounded-lg bg-[#1c1410] border border-[#3a2a1f] text-xs font-bold text-[#f7f1e8] text-center focus:outline-none focus:border-[#e8c170]"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-xs text-[#cbbba9]">
+                  <span>ช่องว่าง (mm)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={0.5}
+                    value={rollGapMm}
+                    onChange={(e) =>
+                      setRollGapMm(Math.min(30, Math.max(0, Number(e.target.value) || 0)))
+                    }
+                    className="w-16 px-2 py-1 rounded-lg bg-[#1c1410] border border-[#3a2a1f] text-xs font-bold text-[#f7f1e8] text-center focus:outline-none focus:border-[#e8c170]"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <button
@@ -822,7 +915,11 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
               className="w-full sm:w-auto flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-base sm:text-lg font-black shadow-2xl transition-transform active:scale-95"
             >
               <Printer className="w-6 h-6" />
-              <span>พิมพ์สติกเกอร์ 1 ดวง (ขนาด 30×40mm)</span>
+              <span>
+                {isRollMode
+                  ? `พิมพ์สติกเกอร์ต่อเนื่อง ${rollCopies} ดวง (โหมด Roll)`
+                  : `พิมพ์สติกเกอร์ 1 ดวง (ขนาด ${calibration.paperWidthMm}×${calibration.paperHeightMm}mm)`}
+              </span>
             </button>
           </div>
         </div>
@@ -867,11 +964,32 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   )
                 )}
               </div>
+            ) : isRollMode ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: `${Math.max(0, rollGapMm) * pxPerMm}px`,
+                }}
+              >
+                {Array.from({ length: Math.min(rollCopies, 3) }, (_, rollIdx) => (
+                  <StickerLabelPreview
+                    key={rollIdx}
+                    config={config}
+                    widthMm={contentWidthMm}
+                    heightMm={Math.max(
+                      10,
+                      rollLabelHeightMm - calibration.marginTopMm - calibration.marginBottomMm
+                    )}
+                    pxPerMm={pxPerMm}
+                  />
+                ))}
+              </div>
             ) : (
               <StickerLabelPreview
                 config={config}
                 widthMm={contentWidthMm}
-                heightMm={calibration.paperHeightMm === null ? null : safeHeightMm}
+                heightMm={safeHeightMm}
                 pxPerMm={pxPerMm}
               />
             )
@@ -936,6 +1054,66 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                     </div>
                   );
                 })
+              : isRollMode ? (
+                  <div
+                    style={{
+                      width: `${calibration.paperWidthMm}mm`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: `${Math.max(0, rollGapMm)}mm`,
+                    }}
+                  >
+                    {Array.from({ length: activeBatchCopies }, (_, idx) => {
+                      const labelH = Math.max(10, rollLabelHeightMm || 40);
+                      const safeContentW =
+                        Math.max(
+                          5,
+                          calibration.paperWidthMm -
+                            calibration.marginLeftMm -
+                            calibration.marginRightMm
+                        ) *
+                        (calibration.contentWidthPct / 100);
+                      const safeContentH =
+                        Math.max(
+                          5,
+                          labelH - calibration.marginTopMm - calibration.marginBottomMm
+                        ) *
+                        ((calibration.contentHeightPct ?? 100) / 100);
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            width: `${calibration.paperWidthMm}mm`,
+                            height: `${labelH}mm`,
+                            paddingTop: `${calibration.marginTopMm}mm`,
+                            paddingRight: `${calibration.marginRightMm}mm`,
+                            paddingBottom: `${calibration.marginBottomMm}mm`,
+                            paddingLeft: `${calibration.marginLeftMm}mm`,
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            breakInside: 'avoid',
+                          }}
+                          className="bg-white"
+                        >
+                          <div
+                            style={{
+                              width: `${calibration.contentWidthPct}%`,
+                              height: `${calibration.contentHeightPct ?? 100}%`,
+                              transform: `translate(${calibration.offsetXMm}mm, ${calibration.offsetYMm}mm)`,
+                              transformOrigin: 'top left',
+                            }}
+                          >
+                            <StickerLabelPreview
+                              config={config}
+                              widthMm={safeContentW}
+                              heightMm={safeContentH}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               : Array.from({ length: activeBatchCopies }, (_, idx) => {
                   const isLandscape =
                     calibration.orientation === 'landscape' &&
