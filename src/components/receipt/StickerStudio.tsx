@@ -317,6 +317,8 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   modelName: '',
                   colorName: '',
                   sizeLabel: '',
+                  barcodeDigits: '',
+                  barcodeCaption: '',
                 })
               }
               className="px-2.5 py-1.5 rounded-lg bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[11px] font-semibold text-[#e8c170] flex items-center gap-1"
@@ -476,14 +478,25 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           {/* Barcode & Write-In Line Style */}
           <div className="pt-2 border-t border-[#2d2118] grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-xs text-[#d6c8b6] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.showBarcode}
-                  onChange={(e) => patchConfig({ showBarcode: e.target.checked })}
-                />
-                <span>แสดงบาร์โค้ดด้านล่างสติกเกอร์</span>
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs text-[#d6c8b6] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.showBarcode}
+                    onChange={(e) => patchConfig({ showBarcode: e.target.checked })}
+                  />
+                  <span>แสดงบาร์โค้ดด้านล่างสติกเกอร์</span>
+                </label>
+                {config.showBarcode && (config.barcodeDigits || config.barcodeCaption) && (
+                  <button
+                    type="button"
+                    onClick={() => patchConfig({ barcodeDigits: '', barcodeCaption: '' })}
+                    className="text-[10px] text-[#e8c170] hover:underline"
+                  >
+                    เว้นว่างไว้เขียนเอง
+                  </button>
+                )}
+              </div>
               {config.showBarcode && (
                 <div className="space-y-1">
                   <input

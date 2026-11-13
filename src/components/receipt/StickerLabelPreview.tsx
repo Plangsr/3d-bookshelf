@@ -281,34 +281,53 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
             metrics.isCompact ? 'mt-[0.26em] pt-[0.14em]' : 'mt-[0.55em] pt-[0.25em]'
           }`}
         >
-          <svg
-            viewBox={`0 0 ${totalSvgWidth} 36`}
-            className={`w-[90%] ${
-              metrics.isCompact ? 'h-[1.45em]' : 'h-[2.1em]'
-            } mx-auto block`}
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {bars.map((b, idx) => (
-              <rect key={idx} x={b.x} y={0} width={b.w} height={36} fill="#000000" />
-            ))}
-          </svg>
-          {config.barcodeDigits.trim() && (
-            <div
-              className={`${
-                metrics.isCompact ? 'text-[0.62em] tracking-[0.1em]' : 'text-[0.72em] tracking-[0.16em]'
-              } font-mono text-black mt-[0.12em] whitespace-nowrap`}
-            >
-              {config.barcodeDigits.trim()}
-            </div>
-          )}
-          {config.barcodeCaption.trim() && (
-            <div
-              className={`${
-                metrics.isCompact ? 'text-[0.46em]' : 'text-[0.54em]'
-              } font-medium text-neutral-700 mt-[0.12em] break-words`}
-            >
-              บาร์โค้ด (BARCODE): {config.barcodeCaption.trim()}
+          {config.barcodeDigits.trim() || config.barcodeCaption.trim() ? (
+            <>
+              <svg
+                viewBox={`0 0 ${totalSvgWidth} 36`}
+                className={`w-[90%] ${
+                  metrics.isCompact ? 'h-[1.45em]' : 'h-[2.1em]'
+                } mx-auto block`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {bars.map((b, idx) => (
+                  <rect key={idx} x={b.x} y={0} width={b.w} height={36} fill="#000000" />
+                ))}
+              </svg>
+              {config.barcodeDigits.trim() && (
+                <div
+                  className={`${
+                    metrics.isCompact ? 'text-[0.62em] tracking-[0.1em]' : 'text-[0.72em] tracking-[0.16em]'
+                  } font-mono text-black mt-[0.12em] whitespace-nowrap`}
+                >
+                  {config.barcodeDigits.trim()}
+                </div>
+              )}
+              {config.barcodeCaption.trim() && (
+                <div
+                  className={`${
+                    metrics.isCompact ? 'text-[0.46em]' : 'text-[0.54em]'
+                  } font-medium text-neutral-700 mt-[0.12em] break-words`}
+                >
+                  บาร์โค้ด (BARCODE): {config.barcodeCaption.trim()}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-left">
+              <div
+                className={`${
+                  metrics.isCompact ? 'text-[0.54em]' : 'text-[0.62em]'
+                } font-medium text-neutral-600`}
+              >
+                บาร์โค้ด (BARCODE):
+              </div>
+              <div
+                className={`${
+                  metrics.isCompact ? 'h-[1.05em]' : 'h-[1.35em]'
+                } w-full mt-[0.12em] ${borderLineClass}`}
+              />
             </div>
           )}
         </div>
