@@ -78,12 +78,10 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     Record<string, PrintLayoutCalibration>
   >(() => loadLayoutCalibrations());
 
-  const [selectedPaperSizeId, setSelectedPaperSizeId] = useState<string>(
-    paperSizes[0]?.id ?? 'size-58mm'
-  );
+  const [selectedPaperSizeId, setSelectedPaperSizeId] = useState<string>('size-30x40');
   const [calibration, setCalibration] = useState<PrintLayoutCalibration>({
-    paperWidthMm: 50,
-    paperHeightMm: 70,
+    paperWidthMm: 30,
+    paperHeightMm: 40,
     orientation: 'portrait',
     marginTopMm: 2,
     marginRightMm: 2,
@@ -97,18 +95,18 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   const [config, setConfig] = useState<StickerConfig>(() => ({
     brandHeader: shopProfile.shopName || '',
     showBrandHeader: false,
-    modelName: shirts[0]?.name || '111036',
-    colorName: shirts[0] ? formatColorDisplayName(shirts[0].color) : 'Pink',
-    sizeLabel: 'L',
+    modelName: '11106',
+    colorName: 'Pink',
+    sizeLabel: 'M',
     writeInLineStyle: 'solid',
-    showBarcode: true,
-    barcodeDigits: '8 851234 567890',
-    barcodeCaption: `${shirts[0]?.sku || '111036'}-L`,
+    showBarcode: false,
+    barcodeDigits: '',
+    barcodeCaption: '',
     borderRadiusMm: 2,
     showCutBorder: true,
-    fontScalePct: 100,
-    textAlign: 'left',
-    detailDensity: 'auto',
+    fontScalePct: 115,
+    textAlign: 'center',
+    detailDensity: 'compact',
   }));
 
   const [copies, setCopies] = useState<number>(10);
