@@ -103,13 +103,13 @@ function computeStickerMetrics(
   }
 
   // For label printers like Xprinter XP-490B (203 DPI, 26mm - 108mm print width),
-  // font scale can go up to 350% to fill the physical label cleanly without overflowing
-  const widthBudgetMm = effW * (isCompact ? 0.082 : 0.092);
-  const heightBudgetMm = (effH * 0.96) / Math.max(4.2, emDemand);
-  const userScale = Math.max(0.45, Math.min(3.5, (config.fontScalePct ?? 100) / 100));
+  // boost font scale so text fills the label boldly and cleanly
+  const widthBudgetMm = effW * (isCompact ? 0.105 : 0.115);
+  const heightBudgetMm = (effH * 0.98) / Math.max(3.8, emDemand);
+  const userScale = Math.max(0.45, Math.min(4.0, (config.fontScalePct ?? 100) / 100));
 
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(0.8, Math.min(14.0, rawFontMm));
+  const baseFontMm = Math.max(1.1, Math.min(18.0, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
@@ -205,16 +205,16 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
-            } font-medium text-neutral-600`}
+              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
+            } font-bold text-neutral-600`}
           >
             รุ่น (MODEL):
           </div>
           {config.modelName.trim() ? (
             <div
               className={`${
-                metrics.isCompact ? 'text-[1.05em]' : 'text-[1.20em]'
-              } font-extrabold tracking-tight text-black mt-[0.08em] break-words`}
+                metrics.isCompact ? 'text-[1.28em]' : 'text-[1.40em]'
+              } font-black tracking-tight text-black mt-[0.04em] break-words`}
             >
               {config.modelName.trim()}
             </div>
@@ -231,16 +231,16 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
-            } font-medium text-neutral-600`}
+              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
+            } font-bold text-neutral-600`}
           >
             สี (COLOR):
           </div>
           {config.colorName.trim() ? (
             <div
               className={`${
-                metrics.isCompact ? 'text-[0.98em]' : 'text-[1.10em]'
-              } font-bold text-[#1d222b] mt-[0.08em] break-words`}
+                metrics.isCompact ? 'text-[1.18em]' : 'text-[1.30em]'
+              } font-black text-[#1d222b] mt-[0.04em] break-words`}
             >
               {config.colorName.trim()}
             </div>
@@ -257,16 +257,16 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         <div className={textAlignClass}>
           <div
             className={`${
-              metrics.isCompact ? 'text-[0.62em]' : 'text-[0.70em]'
-            } font-medium text-neutral-600`}
+              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
+            } font-bold text-neutral-600`}
           >
             ไซส์ (SIZE):
           </div>
           {config.sizeLabel.trim() ? (
             <div
               className={`${textAlignClass} ${
-                metrics.isCompact ? 'text-[1.95em]' : 'text-[2.5em]'
-              } font-black text-black tracking-tight leading-none py-[0.08em]`}
+                metrics.isCompact ? 'text-[2.65em]' : 'text-[3.2em]'
+              } font-black text-black tracking-tight leading-none py-[0.04em]`}
             >
               {config.sizeLabel.trim()}
             </div>

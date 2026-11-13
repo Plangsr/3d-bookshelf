@@ -104,12 +104,12 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     barcodeCaption: '',
     borderRadiusMm: 2,
     showCutBorder: true,
-    fontScalePct: 115,
+    fontScalePct: 150,
     textAlign: 'center',
     detailDensity: 'compact',
   }));
 
-  const [copies, setCopies] = useState<number>(10);
+  const [copies, setCopies] = useState<number>(1);
   const [printLayoutMode, setPrintLayoutMode] = useState<'single' | 'grid'>('single');
   const [gridColumns, setGridColumns] = useState<number>(6);
   const [gridGapMm, setGridGapMm] = useState<number>(3);
