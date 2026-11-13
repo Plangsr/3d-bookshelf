@@ -35,13 +35,14 @@ body {
     color: #000000 !important;
     overflow: visible !important;
     height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
   /* Hide everything on screen by default during print */
   body * {
-    visibility: hidden !important;
+    visibility: hidden;
   }
 
   /* Make sure printable batch / sticker container is fully visible and rendered */
@@ -51,13 +52,13 @@ body {
   }
 
   #printable-batch-root {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: static !important;
     display: block !important;
     background: white !important;
     width: 100% !important;
-    z-index: 999999 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
   /* Receipt root only when explicitly printing a receipt */
@@ -67,13 +68,10 @@ body {
   }
 
   #printable-receipt-root {
-    position: fixed !important;
-    inset: 0 !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: flex-start !important;
+    position: static !important;
+    display: block !important;
     background: white !important;
-    z-index: 99999 !important;
+    margin: 0 auto !important;
     overflow: visible !important;
   }
 

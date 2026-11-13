@@ -326,11 +326,12 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       }
     })();
 
-    requestAnimationFrame(() => {
+    // Small delay to ensure React state (activeBatchCopies) is committed to DOM before triggering print dialog
+    setTimeout(() => {
       requestAnimationFrame(() => {
         window.print();
       });
-    });
+    }, 150);
   };
 
   // Compute grid fit metrics for multi-up A4/A5 sheet mode and Map preview
