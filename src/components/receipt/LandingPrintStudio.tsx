@@ -19,6 +19,7 @@ import {
   applyFreePrintPageStyle,
   calculateReceiptTotals,
   calibrationFromPaperSize,
+  formatColorDisplayName,
   formatTHB,
   generateReceiptNumber,
   loadLayoutCalibrations,
@@ -38,6 +39,7 @@ import type {
 import { PrintPositionMap } from './PrintPositionMap';
 import { QuickUploadPrinter } from './QuickUploadPrinter';
 import { ReceiptPreview } from './ReceiptPreview';
+import { StickerStudio } from './StickerStudio';
 
 interface LandingPrintStudioProps {
   shirts: Shirt[];
@@ -69,7 +71,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   onOpenSizeManager,
   onSwitchTo3DRack,
 }) => {
-  const [studioTab, setStudioTab] = useState<'quick' | 'builder'>('quick');
+  const [studioTab, setStudioTab] = useState<'quick' | 'sticker' | 'builder'>('quick');
   const [printSets, setPrintSets] = useState<PrintSet[]>(() => loadPrintSets());
   const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [setNameInput, setSetNameInput] = useState<string>('');
@@ -85,7 +87,9 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
     () => shirts.find((s) => s.id === quickShirtId) ?? shirts[0],
     [shirts, quickShirtId]
   );
-  const [quickColor, setQuickColor] = useState<string>(selectedQuickShirt?.color ?? '#1a2332');
+  const [quickColor, setQuickColor] = useState<string>(
+    formatColorDisplayName(selectedQuickShirt?.color ?? '#1a2332'),
+  );
   const [quickSizeLabel, setQuickSizeLabel] = useState<string>(
     selectedQuickShirt?.sizes[0]?.label ?? 'M'
   );
@@ -386,6 +390,17 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setStudioTab('sticker')}
+            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+              studioTab === 'sticker'
+                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
+            }`}
+          >
+            สร้างสติกเกอร์แปะเสื้อ (รุ่น • สี • ไซส์)
+          </button>
+          <button
+            type="button"
             onClick={() => setStudioTab('builder')}
             className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
               studioTab === 'builder'
@@ -402,6 +417,13 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             paperSizes={paperSizes}
             defaultPaperSizeId={activePaperSize.id}
             onOpenSizeManager={onOpenSizeManager}
+            onSavePaperSizes={onSavePaperSizes}
+          />
+        ) : studioTab === 'sticker' ? (
+          <StickerStudio
+            shirts={shirts}
+            paperSizes={paperSizes}
+            shopProfile={shopProfile}
             onSavePaperSizes={onSavePaperSizes}
           />
         ) : (
@@ -723,7 +745,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
                       const nextShirt = shirts.find((s) => s.id === e.target.value);
                       setQuickShirtId(e.target.value);
                       if (nextShirt) {
-                        setQuickColor(nextShirt.color);
+                        setQuickColor(formatColorDisplayName(nextShirt.color));
                         if (nextShirt.sizes[0]) {
                           setQuickSizeLabel(nextShirt.sizes[0].label);
                         }

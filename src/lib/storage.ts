@@ -13,6 +13,7 @@ import type {
   ReceiptTotals,
   Shirt,
   ShopProfile,
+  StickerSet,
   VatMode,
 } from '@/types/shirt';
 
@@ -22,6 +23,7 @@ const STORAGE_KEYS = {
   shopProfile: 'atelier_shop_profile_v1',
   receiptHistory: 'atelier_receipt_history_v1',
   printSets: 'atelier_print_sets_v1',
+  stickerSets: 'atelier_sticker_sets_v1',
   layoutCalibrations: 'atelier_layout_calibrations_v1',
   savedPrinters: 'atelier_saved_printers_v1',
   receiptDraft: 'atelier_receipt_draft_v1',
@@ -211,6 +213,32 @@ export function loadSavedPrinters(): DetectedPrinterInfo[] {
 
 export function saveSavedPrinters(printers: DetectedPrinterInfo[]): void {
   writeStorageJson(STORAGE_KEYS.savedPrinters, printers);
+}
+
+export function loadStickerSets(): StickerSet[] {
+  const parsed = readStorageJson(STORAGE_KEYS.stickerSets);
+  if (Array.isArray(parsed)) {
+    return parsed as StickerSet[];
+  }
+  return [];
+}
+
+export function saveStickerSets(sets: StickerSet[]): void {
+  writeStorageJson(STORAGE_KEYS.stickerSets, sets);
+}
+
+const COLOR_HEX_TO_THAI: Record<string, string> = {
+  '#1a2332': 'กรมท่า (NAVY BLUE)',
+  '#4c171e': 'เบอร์กันดีไวน์ (BURGUNDY)',
+  '#1b3b2b': 'เขียวไพร (FOREST GREEN)',
+  '#e8e2d8': 'ครีมงาช้าง (IVORY)',
+  '#382e25': 'น้ำตาลเอสเพรสโซ่ (ESPRESSO)',
+  '#222225': 'ดำชาร์โคล (CHARCOAL)',
+};
+
+export function formatColorDisplayName(rawColor: string): string {
+  const key = rawColor.trim().toLowerCase();
+  return COLOR_HEX_TO_THAI[key] || rawColor;
 }
 
 export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): void {

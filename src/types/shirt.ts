@@ -79,6 +79,30 @@ export interface DetectedPrinterInfo {
   defaultPaperSizeId?: string;
 }
 
+export interface StickerConfig {
+  brandHeader: string;
+  showBrandHeader: boolean;
+  modelName: string;
+  colorName: string;
+  sizeLabel: string;
+  writeInLineStyle: 'solid' | 'dashed';
+  showBarcode: boolean;
+  barcodeDigits: string;
+  barcodeCaption: string;
+  borderRadiusMm: number;
+  showCutBorder: boolean;
+}
+
+export interface StickerSet {
+  id: string;
+  name: string;
+  config: StickerConfig;
+  paperSizeId: string;
+  calibration: PrintLayoutCalibration;
+  defaultCopies: number;
+  updatedAt: string;
+}
+
 export interface ReceiptLineItem {
   lineId: string;
   shirtId: string;
