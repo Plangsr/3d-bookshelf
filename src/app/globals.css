@@ -39,35 +39,34 @@ body {
     padding: 0 !important;
   }
 
+  /* Hide everything on screen by default during print */
   body * {
     visibility: hidden !important;
   }
 
-  /* When printing batch / stickers / quick upload, only show printable-batch-root */
-  body:has(#printable-batch-root) #printable-batch-root,
-  body:has(#printable-batch-root) #printable-batch-root * {
+  /* Make sure printable batch / sticker container is fully visible and rendered */
+  #printable-batch-root,
+  #printable-batch-root * {
     visibility: visible !important;
   }
 
-  body:has(#printable-batch-root) #printable-batch-root {
-    position: static !important;
+  #printable-batch-root {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     display: block !important;
     background: white !important;
     width: 100% !important;
+    z-index: 999999 !important;
   }
 
-  body:has(#printable-batch-root) #printable-receipt-root {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Fallback: when printing standard single receipt (and NO printable-batch-root exists) */
-  body:not(:has(#printable-batch-root)) #printable-receipt-root,
-  body:not(:has(#printable-batch-root)) #printable-receipt-root * {
+  /* Receipt root only when explicitly printing a receipt */
+  #printable-receipt-root,
+  #printable-receipt-root * {
     visibility: visible !important;
   }
 
-  body:not(:has(#printable-batch-root)) #printable-receipt-root {
+  #printable-receipt-root {
     position: fixed !important;
     inset: 0 !important;
     display: flex !important;

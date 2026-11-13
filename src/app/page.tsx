@@ -79,6 +79,7 @@ export default function Home() {
   const [isSizeManagerOpen, setIsSizeManagerOpen] = useState(false);
 
   // Optional temporary receipt override when reprinting a historical receipt
+  const [printingReceiptActive, setPrintingReceiptActive] = useState(false);
   const [printingRecord, setPrintingRecord] = useState<ReceiptRecord | null>(null);
   const shopSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -231,6 +232,7 @@ export default function Home() {
 
     const handleAfterPrint = () => {
       setPrintingRecord(null);
+      setPrintingReceiptActive(false);
     };
     window.addEventListener('afterprint', handleAfterPrint);
 
@@ -479,6 +481,7 @@ export default function Home() {
   };
 
   const handlePrintReceipt = (recordOverride?: ReceiptRecord) => {
+    setPrintingReceiptActive(true);
     if (recordOverride) {
       const targetPaper =
         paperSizes.find((p) => p.id === recordOverride.paperSizeId) ?? activePaperSize;
@@ -509,7 +512,7 @@ export default function Home() {
   return (
     <>
       <main
-        className={`relative w-screen h-screen bg-[#0c0907] print:hidden ${
+        className={`relative w-screen h-screen bg-[#0c0907] ${
           activeView === 'studio' ? 'overflow-y-auto' : 'overflow-hidden'
         }`}
       >
@@ -621,15 +624,17 @@ export default function Home() {
         />
       </main>
 
-      {/* Dedicated Printable Receipt Root */}
-      <div id="printable-receipt-root" className="hidden print:block">
-        <ReceiptPreview
-          draft={printableTarget}
-          paperSize={printablePaperSize}
-          totals={printableTotals}
-          zoom={1}
-        />
-      </div>
+      {/* Dedicated Printable Receipt Root (Rendered ONLY when intentionally printing a receipt from ReceiptStudio) */}
+      {printingReceiptActive && (
+        <div id="printable-receipt-root" className="hidden print:block">
+          <ReceiptPreview
+            draft={printableTarget}
+            paperSize={printablePaperSize}
+            totals={printableTotals}
+            zoom={1}
+          />
+        </div>
+      )}
     </>
   );
 }
