@@ -4,6 +4,8 @@ import {
   INITIAL_SHIRTS,
 } from '@/data/shirts';
 import type {
+  DetectedPrinterInfo,
+  PrintLayoutCalibration,
   PrintSet,
   ReceiptLineItem,
   ReceiptPaperSize,
@@ -20,6 +22,8 @@ const STORAGE_KEYS = {
   shopProfile: 'atelier_shop_profile_v1',
   receiptHistory: 'atelier_receipt_history_v1',
   printSets: 'atelier_print_sets_v1',
+  layoutCalibrations: 'atelier_layout_calibrations_v1',
+  savedPrinters: 'atelier_saved_printers_v1',
   receiptDraft: 'atelier_receipt_draft_v1',
 } as const;
 
@@ -161,6 +165,75 @@ export function loadPrintSets(): PrintSet[] {
 
 export function savePrintSets(sets: PrintSet[]): void {
   writeStorageJson(STORAGE_KEYS.printSets, sets);
+}
+
+export function calibrationFromPaperSize(
+  paperSize: ReceiptPaperSize,
+  savedMap?: Record<string, PrintLayoutCalibration>
+): PrintLayoutCalibration {
+  const saved = savedMap?.[paperSize.id];
+  if (saved) {
+    return { ...saved };
+  }
+  return {
+    paperWidthMm: paperSize.widthMm,
+    paperHeightMm: paperSize.heightMm,
+    orientation: paperSize.orientation,
+    marginTopMm: paperSize.marginMm,
+    marginRightMm: paperSize.marginMm,
+    marginBottomMm: paperSize.marginMm,
+    marginLeftMm: paperSize.marginMm,
+    offsetXMm: 0,
+    offsetYMm: 0,
+    contentWidthPct: 100,
+  };
+}
+
+export function loadLayoutCalibrations(): Record<string, PrintLayoutCalibration> {
+  const parsed = readStorageJson(STORAGE_KEYS.layoutCalibrations);
+  if (isPlainObject(parsed)) {
+    return parsed as Record<string, PrintLayoutCalibration>;
+  }
+  return {};
+}
+
+export function saveLayoutCalibrations(map: Record<string, PrintLayoutCalibration>): void {
+  writeStorageJson(STORAGE_KEYS.layoutCalibrations, map);
+}
+
+export function loadSavedPrinters(): DetectedPrinterInfo[] {
+  const parsed = readStorageJson(STORAGE_KEYS.savedPrinters);
+  if (Array.isArray(parsed)) {
+    return parsed as DetectedPrinterInfo[];
+  }
+  return [];
+}
+
+export function saveSavedPrinters(printers: DetectedPrinterInfo[]): void {
+  writeStorageJson(STORAGE_KEYS.savedPrinters, printers);
+}
+
+export function applyFreePrintPageStyle(calibration: PrintLayoutCalibration): void {
+  if (typeof document === 'undefined') return;
+  const styleId = 'dynamic-print-page-style';
+  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+  const isLandscape =
+    calibration.orientation === 'landscape' && calibration.paperHeightMm !== null;
+  const width =
+    isLandscape && calibration.paperHeightMm
+      ? calibration.paperHeightMm
+      : calibration.paperWidthMm;
+  const height =
+    calibration.paperHeightMm === null
+      ? 'auto'
+      : `${isLandscape ? calibration.paperWidthMm : calibration.paperHeightMm}mm`;
+  // Set @page margin to 0mm so the page box's padding & offsets match the visual Paper Map 1:1.
+  styleEl.textContent = `@media print { @page { size: ${width}mm ${height}; margin: 0mm; } }`;
 }
 
 /**

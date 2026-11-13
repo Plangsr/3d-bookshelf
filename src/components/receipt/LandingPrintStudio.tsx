@@ -16,42 +16,28 @@ import {
 } from 'lucide-react';
 import { INITIAL_PAPER_SIZES, RECEIPT_TEMPLATE_META } from '@/data/shirts';
 import {
+  applyFreePrintPageStyle,
   calculateReceiptTotals,
+  calibrationFromPaperSize,
   formatTHB,
   generateReceiptNumber,
+  loadLayoutCalibrations,
   loadPrintSets,
+  saveLayoutCalibrations,
   savePrintSets,
 } from '@/lib/storage';
 import type {
-  PaymentMethod,
+  PrintLayoutCalibration,
   PrintSet,
   ReceiptDraft,
   ReceiptPaperSize,
   ReceiptTemplateType,
   Shirt,
   ShopProfile,
-  VatMode,
 } from '@/types/shirt';
+import { PrintPositionMap } from './PrintPositionMap';
 import { QuickUploadPrinter } from './QuickUploadPrinter';
 import { ReceiptPreview } from './ReceiptPreview';
-
-function applyDynamicPrintPageStyle(paperSize: ReceiptPaperSize): void {
-  if (typeof document === 'undefined') return;
-  const styleId = 'dynamic-print-page-style';
-  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = styleId;
-    document.head.appendChild(styleEl);
-  }
-  const isLandscape = paperSize.orientation === 'landscape' && paperSize.heightMm !== null;
-  const width = isLandscape && paperSize.heightMm ? paperSize.heightMm : paperSize.widthMm;
-  const height =
-    paperSize.heightMm === null
-      ? 'auto'
-      : `${isLandscape ? paperSize.widthMm : paperSize.heightMm}mm`;
-  styleEl.textContent = `@media print { @page { size: ${width}mm ${height}; margin: ${paperSize.marginMm}mm; } }`;
-}
 
 interface LandingPrintStudioProps {
   shirts: Shirt[];
@@ -59,6 +45,7 @@ interface LandingPrintStudioProps {
   shopProfile: ShopProfile;
   draft: ReceiptDraft;
   onUpdateDraft: (next: ReceiptDraft) => void;
+  onSavePaperSizes?: (sizes: ReceiptPaperSize[]) => void;
   onOpenSizeManager: () => void;
   onSwitchTo3DRack: () => void;
 }
@@ -70,13 +57,6 @@ const TEMPLATE_KEYS: ReceiptTemplateType[] = [
   'boutique_gift',
 ];
 
-const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
-  { id: 'transfer', label: 'โอน / PromptPay' },
-  { id: 'cash', label: 'เงินสด' },
-  { id: 'card', label: 'บัตรเครดิต' },
-  { id: 'cod', label: 'เก็บเงินปลายทาง (COD)' },
-];
-
 const BATCH_PRESETS = [1, 10, 50, 100, 500, 1000];
 
 export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
@@ -85,6 +65,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   shopProfile,
   draft,
   onUpdateDraft,
+  onSavePaperSizes,
   onOpenSizeManager,
   onSwitchTo3DRack,
 }) => {
@@ -125,6 +106,36 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
       INITIAL_PAPER_SIZES[1],
     [paperSizes, draft.paperSizeId]
   );
+
+  const [savedCalibrations, setSavedCalibrations] = useState<
+    Record<string, PrintLayoutCalibration>
+  >(() => loadLayoutCalibrations());
+  const [builderCalibration, setBuilderCalibration] = useState<PrintLayoutCalibration>(
+    () => calibrationFromPaperSize(activePaperSize, loadLayoutCalibrations())
+  );
+
+  const handleSelectBuilderPreset = (paperSizeId: string) => {
+    patchDraft({ paperSizeId });
+    const target =
+      paperSizes.find((p) => p.id === paperSizeId) ??
+      paperSizes[0] ??
+      INITIAL_PAPER_SIZES[1];
+    setBuilderCalibration(calibrationFromPaperSize(target, savedCalibrations));
+  };
+
+  const handleSaveBuilderPreset = (
+    newPreset: ReceiptPaperSize,
+    calibration: PrintLayoutCalibration
+  ) => {
+    const nextMap = { ...savedCalibrations, [newPreset.id]: { ...calibration } };
+    setSavedCalibrations(nextMap);
+    saveLayoutCalibrations(nextMap);
+    if (onSavePaperSizes) {
+      onSavePaperSizes([...paperSizes, newPreset]);
+    }
+    patchDraft({ paperSizeId: newPreset.id });
+    setStatusText(`บันทึก Preset "${newPreset.name}" พร้อมระยะตำแหน่งบน Map แล้ว`);
+  };
 
   const totals = useMemo(
     () =>
@@ -302,7 +313,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
 
   const handleBatchPrint = () => {
     const safeCopies = Math.min(2000, Math.max(1, Math.floor(copies) || 1));
-    applyDynamicPrintPageStyle(activePaperSize);
+    applyFreePrintPageStyle(builderCalibration);
     setActiveBatchCopies(safeCopies);
     setStatusText(`กำลังเตรียมพิมพ์ ${safeCopies.toLocaleString()} ใบ (ไม่ส่งขึ้น Server)...`);
     requestAnimationFrame(() => {
@@ -313,7 +324,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#120d0a] text-[#f5efe6] pt-20 pb-10 px-4 sm:px-6 overflow-y-auto">
+    <div className="min-h-screen w-full bg-[#120d0a] text-[#f5efe6] pt-4 pb-10 px-4 sm:px-6 overflow-y-auto">
       <div className="max-w-7xl mx-auto space-y-5">
         {/* Top Hero Strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#3a2a1f] bg-[#1a130e] px-5 py-4">
@@ -391,6 +402,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             paperSizes={paperSizes}
             defaultPaperSizeId={activePaperSize.id}
             onOpenSizeManager={onOpenSizeManager}
+            onSavePaperSizes={onSavePaperSizes}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -863,27 +875,29 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Live Single-Page Preview */}
-          <div className="lg:col-span-5 rounded-2xl border border-[#3a2a1f] bg-[#1a130e] p-4 space-y-3 lg:sticky lg:top-20">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-[#f7f1e8]">ตัวอย่างใบเสร็จ (1 ใบ)</span>
-              <span className="text-[#a99784] font-mono">
-                {activePaperSize.widthMm}×{activePaperSize.heightMm ?? 'Auto'} mm
-              </span>
-            </div>
-            <div className="overflow-auto max-h-[72vh] rounded-xl bg-[#2a211b] p-3 flex justify-center">
+          {/* Right Column: Interactive Print Position Map */}
+          <div className="lg:col-span-5 lg:sticky lg:top-16">
+            <PrintPositionMap
+              paperSizes={paperSizes}
+              selectedPaperSizeId={activePaperSize.id}
+              calibration={builderCalibration}
+              onChangeCalibration={setBuilderCalibration}
+              onSelectPreset={handleSelectBuilderPreset}
+              onSaveAsNewPreset={onSavePaperSizes ? handleSaveBuilderPreset : undefined}
+              title="Map ระยะขอบ & ตำแหน่งพิมพ์จริง (1 ใบ)"
+            >
               <ReceiptPreview
                 draft={{ ...draft, shop: shopProfile }}
                 paperSize={activePaperSize}
                 totals={totals}
               />
-            </div>
+            </PrintPositionMap>
           </div>
         </div>
         )}
       </div>
 
-      {/* Print-only Batch Container (hidden on screen, paginated on print) */}
+      {/* Print-only Calibrated Batch Container (1:1 Physical Margins & Offset) */}
       {activeBatchCopies > 0 && (
         <div id="printable-batch-root" className="hidden print:block">
           {Array.from({ length: activeBatchCopies }, (_, idx) => {
@@ -891,13 +905,47 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
               activeBatchCopies > 1 && autoNumberBatch
                 ? `${draft.receiptNo}-${String(idx + 1).padStart(4, '0')}`
                 : draft.receiptNo;
+            const isLandscape =
+              builderCalibration.orientation === 'landscape' &&
+              builderCalibration.paperHeightMm !== null;
+            const pageW =
+              isLandscape && builderCalibration.paperHeightMm
+                ? builderCalibration.paperHeightMm
+                : builderCalibration.paperWidthMm;
+            const pageH =
+              builderCalibration.paperHeightMm === null
+                ? null
+                : isLandscape
+                ? builderCalibration.paperWidthMm
+                : builderCalibration.paperHeightMm;
             return (
-              <div key={idx} className="print-page-break flex justify-center">
-                <ReceiptPreview
-                  draft={{ ...draft, shop: shopProfile, receiptNo: copyReceiptNo }}
-                  paperSize={activePaperSize}
-                  totals={totals}
-                />
+              <div
+                key={idx}
+                style={{
+                  width: `${pageW}mm`,
+                  height: pageH !== null ? `${pageH}mm` : 'auto',
+                  paddingTop: `${builderCalibration.marginTopMm}mm`,
+                  paddingRight: `${builderCalibration.marginRightMm}mm`,
+                  paddingBottom: `${builderCalibration.marginBottomMm}mm`,
+                  paddingLeft: `${builderCalibration.marginLeftMm}mm`,
+                  boxSizing: 'border-box',
+                  overflow: pageH !== null ? 'hidden' : 'visible',
+                }}
+                className="print-page-break bg-white"
+              >
+                <div
+                  style={{
+                    width: `${builderCalibration.contentWidthPct}%`,
+                    transform: `translate(${builderCalibration.offsetXMm}mm, ${builderCalibration.offsetYMm}mm)`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <ReceiptPreview
+                    draft={{ ...draft, shop: shopProfile, receiptNo: copyReceiptNo }}
+                    paperSize={activePaperSize}
+                    totals={totals}
+                  />
+                </div>
               </div>
             );
           })}

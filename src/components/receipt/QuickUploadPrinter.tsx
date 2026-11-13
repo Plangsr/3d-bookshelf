@@ -1,8 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileImage, FileText, Printer, Ruler, Trash2, Upload } from 'lucide-react';
-import type { ReceiptPaperSize } from '@/types/shirt';
+import {
+  applyFreePrintPageStyle,
+  calibrationFromPaperSize,
+  loadLayoutCalibrations,
+  saveLayoutCalibrations,
+} from '@/lib/storage';
+import type {
+  DetectedPrinterInfo,
+  PrintLayoutCalibration,
+  ReceiptPaperSize,
+} from '@/types/shirt';
+import { PrinterSelectorCard } from './PrinterSelectorCard';
+import { PrintPositionMap } from './PrintPositionMap';
 
 interface UploadedDocItem {
   id: string;
@@ -11,47 +23,58 @@ interface UploadedDocItem {
   dataUrl: string;
   paperSizeId: string;
   copies: number;
+  calibration: PrintLayoutCalibration;
 }
 
 interface QuickUploadPrinterProps {
   paperSizes: ReceiptPaperSize[];
   defaultPaperSizeId: string;
   onOpenSizeManager: () => void;
-}
-
-function applyDynamicPageStyle(paperSize: ReceiptPaperSize): void {
-  if (typeof document === 'undefined') return;
-  const styleId = 'dynamic-print-page-style';
-  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = styleId;
-    document.head.appendChild(styleEl);
-  }
-  const isLandscape = paperSize.orientation === 'landscape' && paperSize.heightMm !== null;
-  const width = isLandscape && paperSize.heightMm ? paperSize.heightMm : paperSize.widthMm;
-  const height =
-    paperSize.heightMm === null
-      ? 'auto'
-      : `${isLandscape ? paperSize.widthMm : paperSize.heightMm}mm`;
-  styleEl.textContent = `@media print { @page { size: ${width}mm ${height}; margin: ${paperSize.marginMm}mm; } }`;
+  onSavePaperSizes?: (sizes: ReceiptPaperSize[]) => void;
 }
 
 export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
   paperSizes,
   defaultPaperSizeId,
   onOpenSizeManager,
+  onSavePaperSizes,
 }) => {
+  const [savedCalibrations, setSavedCalibrations] = useState<
+    Record<string, PrintLayoutCalibration>
+  >(() => loadLayoutCalibrations());
   const [docs, setDocs] = useState<UploadedDocItem[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [selectedPrinter, setSelectedPrinter] = useState<DetectedPrinterInfo | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [printingDoc, setPrintingDoc] = useState<UploadedDocItem | null>(null);
+
+  const fallbackPaper = useMemo(
+    () =>
+      paperSizes.find((p) => p.id === defaultPaperSizeId) ?? paperSizes[0],
+    [paperSizes, defaultPaperSizeId]
+  );
+
+  const [standbyPaperSizeId, setStandbyPaperSizeId] = useState<string>(
+    defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm'
+  );
+  const [standbyCalibration, setStandbyCalibration] = useState<PrintLayoutCalibration>(
+    () =>
+      calibrationFromPaperSize(
+        paperSizes.find((p) => p.id === defaultPaperSizeId) ?? paperSizes[0],
+        loadLayoutCalibrations()
+      )
+  );
 
   useEffect(() => {
     const onAfterPrint = () => setPrintingDoc(null);
     window.addEventListener('afterprint', onAfterPrint);
     return () => window.removeEventListener('afterprint', onAfterPrint);
   }, []);
+
+  const makeCalibration = (paperSizeId: string): PrintLayoutCalibration => {
+    const targetPaper = paperSizes.find((p) => p.id === paperSizeId) ?? fallbackPaper;
+    return calibrationFromPaperSize(targetPaper, savedCalibrations);
+  };
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -61,6 +84,8 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
       const isImage = file.type.startsWith('image/');
       if (!isPdf && !isImage) return;
 
+      const targetPaperId = standbyPaperSizeId || defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm';
+
       if (isPdf) {
         const objectUrl = URL.createObjectURL(file);
         const newItem: UploadedDocItem = {
@@ -68,11 +93,12 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
           name: file.name,
           kind: 'pdf',
           dataUrl: objectUrl,
-          paperSizeId: defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm',
+          paperSizeId: targetPaperId,
           copies: 1,
+          calibration: { ...standbyCalibration },
         };
         setDocs((prev) => [newItem, ...prev]);
-        setSelectedDocId((curr) => curr || newItem.id);
+        setSelectedDocId(newItem.id);
         return;
       }
 
@@ -84,11 +110,12 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
           name: file.name,
           kind: 'image',
           dataUrl: reader.result,
-          paperSizeId: defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm',
+          paperSizeId: targetPaperId,
           copies: 1,
+          calibration: { ...standbyCalibration },
         };
         setDocs((prev) => [newItem, ...prev]);
-        setSelectedDocId((curr) => curr || newItem.id);
+        setSelectedDocId(newItem.id);
       };
       reader.readAsDataURL(file);
     });
@@ -103,10 +130,47 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
     if (selectedDocId === id) setSelectedDocId('');
   };
 
+  const handleSelectPresetForActive = (paperSizeId: string) => {
+    const nextCal = makeCalibration(paperSizeId);
+    if (activeDoc) {
+      updateDoc(activeDoc.id, { paperSizeId, calibration: nextCal });
+    } else {
+      setStandbyPaperSizeId(paperSizeId);
+      setStandbyCalibration(nextCal);
+    }
+  };
+
+  const handleChangeCalibration = (nextCal: PrintLayoutCalibration) => {
+    if (activeDoc) {
+      updateDoc(activeDoc.id, { calibration: nextCal });
+    } else {
+      setStandbyCalibration(nextCal);
+    }
+  };
+
+  const handleSaveNewPresetFromMap = (
+    newPreset: ReceiptPaperSize,
+    calibration: PrintLayoutCalibration
+  ) => {
+    const nextCalMap = {
+      ...savedCalibrations,
+      [newPreset.id]: { ...calibration },
+    };
+    setSavedCalibrations(nextCalMap);
+    saveLayoutCalibrations(nextCalMap);
+
+    if (onSavePaperSizes) {
+      onSavePaperSizes([...paperSizes, newPreset]);
+    }
+    if (activeDoc) {
+      updateDoc(activeDoc.id, { paperSizeId: newPreset.id });
+    } else {
+      setStandbyPaperSizeId(newPreset.id);
+    }
+  };
+
   const handlePrintDoc = (doc: UploadedDocItem) => {
-    const paper = paperSizes.find((p) => p.id === doc.paperSizeId) ?? paperSizes[0];
-    if (!paper) return;
-    applyDynamicPageStyle(paper);
+    applyFreePrintPageStyle(doc.calibration);
 
     if (doc.kind === 'pdf') {
       const iframe = document.createElement('iframe');
@@ -139,13 +203,21 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
   };
 
   const activeDoc = docs.find((d) => d.id === selectedDocId) ?? docs[0] ?? null;
-  const activePaper = activeDoc
-    ? paperSizes.find((p) => p.id === activeDoc.paperSizeId) ?? paperSizes[0]
-    : paperSizes[0];
+  const activePaperSizeId = activeDoc?.paperSizeId ?? standbyPaperSizeId;
+  const activeCalibration = activeDoc?.calibration ?? standbyCalibration;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-      <div className="lg:col-span-7 space-y-4">
+      <div className="lg:col-span-6 space-y-4">
+        {/* Detected & Saved Printers Info */}
+        <PrinterSelectorCard
+          paperSizes={paperSizes}
+          selectedPrinterId={selectedPrinter?.id}
+          activePaperSizeId={activePaperSizeId}
+          onSelectPrinter={(p) => setSelectedPrinter(p)}
+          onApplyMappedPaperSize={(paperSizeId) => handleSelectPresetForActive(paperSizeId)}
+        />
+
         {/* Upload Dropzone */}
         <div
           onDragOver={(e) => {
@@ -171,10 +243,10 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
               </div>
               <div>
                 <div className="text-sm font-bold text-[#f7f1e8]">
-                  อัปโหลดใบเสร็จ / เอกสารของร้าน (เลือกได้หลายไฟล์, ไม่ส่งขึ้น Server)
+                  อัปโหลดใบเสร็จ / สลิป PDF หรือรูปภาพ (ไม่ส่งขึ้น Server)
                 </div>
                 <div className="text-xs text-[#a99784]">
-                  ลากรูปใบเสร็จมาวาง แล้วเลือกขนาด Preset สำหรับเครื่องพิมพ์เดียวได้ทันที
+                  รองรับ .pdf และไฟล์รูปภาพ ปรับตำแหน่ง/ขนาดพิมพ์บน Map ด้านขวาได้อิสระ
                 </div>
               </div>
             </div>
@@ -186,7 +258,7 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
                 className="px-3 py-2 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-xs font-semibold text-[#e8c170] flex items-center gap-1.5"
               >
                 <Ruler className="w-3.5 h-3.5" />
-                <span>จัดการขนาด Preset</span>
+                <span>จัดการ Preset</span>
               </button>
               <label className="cursor-pointer px-4 py-2 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-xs font-bold flex items-center gap-1.5">
                 <FileImage className="w-4 h-4" />
@@ -213,13 +285,13 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
               รายการใบเสร็จที่พร้อมพิมพ์ ({docs.length} ไฟล์)
             </div>
             <span className="text-[11px] text-[#a99784]">
-              เลือกขนาด Preset แยกแต่ละใบได้
+              คลิกที่ไฟล์เพื่อดู Map และปรับระยะขอบ/ตำแหน่งแยกแต่ละไฟล์
             </span>
           </div>
 
           {docs.length === 0 ? (
             <div className="rounded-xl border border-[#2f231a] bg-[#120d0a] p-6 text-center text-xs text-[#8f7e6c]">
-              ยังไม่มีไฟล์ใบเสร็จ — กดปุ่ม &ldquo;เลือกไฟล์ใบเสร็จ&rdquo; หรือลากรูปมาวางด้านบน
+              ยังไม่มีไฟล์ใบเสร็จ — กดปุ่ม &ldquo;เลือกไฟล์ใบเสร็จ&rdquo; หรือลาก PDF/รูปภาพมาวางด้านบน
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -257,12 +329,18 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
                           <select
                             value={doc.paperSizeId}
                             onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => updateDoc(doc.id, { paperSizeId: e.target.value })}
+                            onChange={(e) => {
+                              const nextCal = makeCalibration(e.target.value);
+                              updateDoc(doc.id, {
+                                paperSizeId: e.target.value,
+                                calibration: nextCal,
+                              });
+                            }}
                             className="px-2.5 py-1.5 rounded-lg bg-[#1a130e] border border-[#443326] text-xs text-[#faf5ee]"
                           >
                             {paperSizes.map((p) => (
                               <option key={p.id} value={p.id}>
-                                {p.name} ({p.widthMm}×{p.heightMm ?? 'Auto'}mm)
+                                {p.name}
                               </option>
                             ))}
                           </select>
@@ -319,64 +397,88 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
         </div>
       </div>
 
-      {/* Right Preview */}
-      <div className="lg:col-span-5 rounded-2xl border border-[#3a2a1f] bg-[#1a130e] p-4 space-y-3 lg:sticky lg:top-20">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-[#f7f1e8]">
-            พรีวิวขนาดจริง ({activePaper?.name ?? '80mm'})
-          </span>
-          {activePaper && (
-            <span className="text-[#a99784] font-mono">
-              {activePaper.widthMm}×{activePaper.heightMm ?? 'Auto'} mm
-            </span>
-          )}
-        </div>
-        <div className="overflow-auto max-h-[72vh] rounded-xl bg-[#2a211b] p-4 flex justify-center">
-          {activeDoc && activePaper ? (
-            <div
-              style={{
-                width: `${activePaper.widthMm}mm`,
-                minHeight: activePaper.heightMm ? `${activePaper.heightMm}mm` : 'auto',
-                padding: `${activePaper.marginMm}mm`,
-              }}
-              className="bg-white shadow-2xl border border-neutral-200 flex items-start justify-center"
-            >
-              {activeDoc.kind === 'pdf' ? (
-                <iframe
-                  src={activeDoc.dataUrl}
-                  title={activeDoc.name}
-                  className="w-full h-[60vh] border-0 bg-white"
-                />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={activeDoc.dataUrl}
-                  alt={activeDoc.name}
-                  className="w-full h-auto object-contain"
-                />
-              )}
-            </div>
+      {/* Right Column: Interactive Print Position & Margin Map */}
+      <div className="lg:col-span-6 lg:sticky lg:top-16">
+        <PrintPositionMap
+          paperSizes={paperSizes}
+          selectedPaperSizeId={activePaperSizeId}
+          calibration={activeCalibration}
+          onChangeCalibration={handleChangeCalibration}
+          onSelectPreset={handleSelectPresetForActive}
+          onSaveAsNewPreset={onSavePaperSizes ? handleSaveNewPresetFromMap : undefined}
+          printerName={selectedPrinter?.name}
+        >
+          {activeDoc ? (
+            activeDoc.kind === 'pdf' ? (
+              <iframe
+                src={activeDoc.dataUrl}
+                title={activeDoc.name}
+                className="w-full h-56 border-0 bg-white pointer-events-none"
+              />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={activeDoc.dataUrl}
+                alt={activeDoc.name}
+                className="w-full h-auto object-contain block"
+              />
+            )
           ) : (
-            <div className="py-16 text-xs text-[#8f7e6c] text-center">
-              อัปโหลดใบเสร็จด้านซ้ายเพื่อดูตัวอย่างตามขนาด Preset
+            <div className="border border-dashed border-sky-400/70 bg-sky-50/70 p-3 text-center text-sky-900">
+              <div className="font-bold">พื้นที่พิมพ์ใบเสร็จ</div>
+              <div className="opacity-75 mt-0.5">ลากเพื่อปรับตำแหน่งได้</div>
             </div>
           )}
-        </div>
+        </PrintPositionMap>
       </div>
 
-      {/* Print-only Pure Document Batch Container */}
+      {/* Print-only Calibrated Document Batch Container (1:1 Physical Margins & Offset) */}
       {printingDoc && (
         <div id="printable-batch-root" className="hidden print:block">
-          {Array.from({ length: printingDoc.copies }, (_, idx) => (
-            <div key={idx} className="print-page-break flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={printingDoc.dataUrl}
-                alt={printingDoc.name}
-                className="w-full h-auto object-contain"
-              />
-            </div>
-          ))}
+          {Array.from({ length: printingDoc.copies }, (_, idx) => {
+            const cal = printingDoc.calibration;
+            const isLandscape =
+              cal.orientation === 'landscape' && cal.paperHeightMm !== null;
+            const pageW =
+              isLandscape && cal.paperHeightMm ? cal.paperHeightMm : cal.paperWidthMm;
+            const pageH =
+              cal.paperHeightMm === null
+                ? null
+                : isLandscape
+                ? cal.paperWidthMm
+                : cal.paperHeightMm;
+            return (
+              <div
+                key={idx}
+                style={{
+                  width: `${pageW}mm`,
+                  height: pageH !== null ? `${pageH}mm` : 'auto',
+                  paddingTop: `${cal.marginTopMm}mm`,
+                  paddingRight: `${cal.marginRightMm}mm`,
+                  paddingBottom: `${cal.marginBottomMm}mm`,
+                  paddingLeft: `${cal.marginLeftMm}mm`,
+                  boxSizing: 'border-box',
+                  overflow: pageH !== null ? 'hidden' : 'visible',
+                }}
+                className="print-page-break bg-white"
+              >
+                <div
+                  style={{
+                    width: `${cal.contentWidthPct}%`,
+                    transform: `translate(${cal.offsetXMm}mm, ${cal.offsetYMm}mm)`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={printingDoc.dataUrl}
+                    alt={printingDoc.name}
+                    className="w-full h-auto object-contain block"
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

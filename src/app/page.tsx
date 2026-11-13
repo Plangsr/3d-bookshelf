@@ -513,30 +513,38 @@ export default function Home() {
           activeView === 'studio' ? 'overflow-y-auto' : 'overflow-hidden'
         }`}
       >
-        {/* Top View Switcher */}
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 rounded-full border border-[#4a3728] bg-[#17110d]/95 p-1 shadow-xl backdrop-blur">
-          <button
-            type="button"
-            onClick={() => setActiveView('studio')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeView === 'studio'
-                ? 'bg-[#e8c170] text-[#1c1410] font-bold'
-                : 'text-[#d6c8b6] hover:text-white'
-            }`}
-          >
-            อัปโหลด &amp; พิมพ์ใบเสร็จ
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView('rack')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              activeView === 'rack'
-                ? 'bg-[#e8c170] text-[#1c1410] font-bold'
-                : 'text-[#d6c8b6] hover:text-white'
-            }`}
-          >
-            ราวแขวนเสื้อ 3D
-          </button>
+        {/* Top View Switcher (Sticky bar in Studio mode so content never overlaps) */}
+        <div
+          className={
+            activeView === 'studio'
+              ? 'sticky top-0 z-40 w-full bg-[#0c0907]/95 backdrop-blur border-b border-[#2b2017] py-2.5 flex justify-center'
+              : 'fixed top-3 left-1/2 -translate-x-1/2 z-40 flex justify-center'
+          }
+        >
+          <div className="flex items-center gap-1 rounded-full border border-[#4a3728] bg-[#17110d]/95 p-1 shadow-xl backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setActiveView('studio')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                activeView === 'studio'
+                  ? 'bg-[#e8c170] text-[#1c1410] font-bold'
+                  : 'text-[#d6c8b6] hover:text-white'
+              }`}
+            >
+              อัปโหลด &amp; พิมพ์ใบเสร็จ
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('rack')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                activeView === 'rack'
+                  ? 'bg-[#e8c170] text-[#1c1410] font-bold'
+                  : 'text-[#d6c8b6] hover:text-white'
+              }`}
+            >
+              ราวแขวนเสื้อ 3D
+            </button>
+          </div>
         </div>
 
         {activeView === 'studio' ? (
@@ -546,6 +554,7 @@ export default function Home() {
             shopProfile={shopProfile}
             draft={draft}
             onUpdateDraft={handleUpdateDraft}
+            onSavePaperSizes={handleSavePaperSizes}
             onOpenSizeManager={() => setIsSizeManagerOpen(true)}
             onSwitchTo3DRack={() => setActiveView('rack')}
           />

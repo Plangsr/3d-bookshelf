@@ -54,6 +54,31 @@ export interface ReceiptPaperSize {
   isPreset?: boolean;
 }
 
+export interface PrintLayoutCalibration {
+  paperWidthMm: number;
+  paperHeightMm: number | null;
+  orientation: 'portrait' | 'landscape';
+  marginTopMm: number;
+  marginRightMm: number;
+  marginBottomMm: number;
+  marginLeftMm: number;
+  offsetXMm: number;
+  offsetYMm: number;
+  contentWidthPct: number;
+  linkedPrinterId?: string;
+}
+
+export interface DetectedPrinterInfo {
+  id: string;
+  name: string;
+  source: 'windows' | 'webusb' | 'webserial' | 'manual';
+  status: string;
+  driverOrVendor?: string;
+  portOrId?: string;
+  isDefault?: boolean;
+  defaultPaperSizeId?: string;
+}
+
 export interface ReceiptLineItem {
   lineId: string;
   shirtId: string;
