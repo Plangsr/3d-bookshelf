@@ -986,7 +986,8 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   (calibration.contentWidthPct / 100);
                 const safeContentH =
                   pageH !== null
-                    ? Math.max(5, pageH - calibration.marginTopMm - calibration.marginBottomMm)
+                    ? Math.max(5, pageH - calibration.marginTopMm - calibration.marginBottomMm) *
+                      ((calibration.contentHeightPct ?? 100) / 100)
                     : null;
                 return (
                   <div

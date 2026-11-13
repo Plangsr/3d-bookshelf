@@ -41,19 +41,23 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
 }) => {
   const [presetName, setPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
-  const [dragMode, setDragMode] = useState<'none' | 'move' | 'resize'>('none');
+  const [dragMode, setDragMode] = useState<
+    'none' | 'move' | 'resize-e' | 'resize-w' | 'resize-s' | 'resize-n' | 'resize-se'
+  >('none');
   const dragStartRef = useRef<{
     clientX: number;
     clientY: number;
     origOffsetX: number;
     origOffsetY: number;
     origWidthPct: number;
+    origHeightPct: number;
   }>({
     clientX: 0,
     clientY: 0,
     origOffsetX: 0,
     origOffsetY: 0,
     origWidthPct: 100,
+    origHeightPct: 100,
   });
 
   // Compute physical oriented dimensions in mm
@@ -89,7 +93,9 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
     effHeightMm - calibration.marginTopMm - calibration.marginBottomMm
   );
 
+  const contentHeightPct = calibration.contentHeightPct ?? 100;
   const contentWmm = +(safeW * (calibration.contentWidthPct / 100)).toFixed(1);
+  const contentHmm = +(safeH * (contentHeightPct / 100)).toFixed(1);
   const actualStartXmm = +(calibration.marginLeftMm + calibration.offsetXMm).toFixed(1);
   const actualStartYmm = +(calibration.marginTopMm + calibration.offsetYMm).toFixed(1);
   const remainRightMm = +(effWidthMm - actualStartXmm - contentWmm).toFixed(1);
@@ -121,20 +127,25 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
       origOffsetX: calibration.offsetXMm,
       origOffsetY: calibration.offsetYMm,
       origWidthPct: calibration.contentWidthPct,
+      origHeightPct: calibration.contentHeightPct ?? 100,
     };
   };
 
-  const handlePointerDownResize = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDownResize = (
+    e: React.PointerEvent<HTMLDivElement>,
+    mode: 'resize-e' | 'resize-w' | 'resize-s' | 'resize-n' | 'resize-se'
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDragMode('resize');
+    setDragMode(mode);
     dragStartRef.current = {
       clientX: e.clientX,
       clientY: e.clientY,
       origOffsetX: calibration.offsetXMm,
       origOffsetY: calibration.offsetYMm,
       origWidthPct: calibration.contentWidthPct,
+      origHeightPct: calibration.contentHeightPct ?? 100,
     };
   };
 
@@ -151,7 +162,7 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
         offsetXMm: Math.max(-40, Math.min(150, nextX)),
         offsetYMm: Math.max(-40, Math.min(200, nextY)),
       });
-    } else if (dragMode === 'resize') {
+    } else if (dragMode === 'resize-e') {
       const deltaPct = (dxMm / safeW) * 100;
       const nextPct = Math.round(
         Math.max(10, Math.min(200, dragStartRef.current.origWidthPct + deltaPct))
@@ -159,6 +170,53 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
       onChangeCalibration({
         ...calibration,
         contentWidthPct: nextPct,
+      });
+    } else if (dragMode === 'resize-w') {
+      const deltaPct = (-dxMm / safeW) * 100;
+      const nextPct = Math.round(
+        Math.max(10, Math.min(200, dragStartRef.current.origWidthPct + deltaPct))
+      );
+      const actualWidthDeltaMm = ((dragStartRef.current.origWidthPct - nextPct) / 100) * safeW;
+      const nextX = Math.round((dragStartRef.current.origOffsetX + actualWidthDeltaMm) * 2) / 2;
+      onChangeCalibration({
+        ...calibration,
+        offsetXMm: Math.max(-40, Math.min(150, nextX)),
+        contentWidthPct: nextPct,
+      });
+    } else if (dragMode === 'resize-s') {
+      const deltaPct = (dyMm / safeH) * 100;
+      const nextPct = Math.round(
+        Math.max(10, Math.min(200, dragStartRef.current.origHeightPct + deltaPct))
+      );
+      onChangeCalibration({
+        ...calibration,
+        contentHeightPct: nextPct,
+      });
+    } else if (dragMode === 'resize-n') {
+      const deltaPct = (-dyMm / safeH) * 100;
+      const nextPct = Math.round(
+        Math.max(10, Math.min(200, dragStartRef.current.origHeightPct + deltaPct))
+      );
+      const actualHeightDeltaMm = ((dragStartRef.current.origHeightPct - nextPct) / 100) * safeH;
+      const nextY = Math.round((dragStartRef.current.origOffsetY + actualHeightDeltaMm) * 2) / 2;
+      onChangeCalibration({
+        ...calibration,
+        offsetYMm: Math.max(-40, Math.min(200, nextY)),
+        contentHeightPct: nextPct,
+      });
+    } else if (dragMode === 'resize-se') {
+      const deltaWPct = (dxMm / safeW) * 100;
+      const deltaHPct = (dyMm / safeH) * 100;
+      const nextWPct = Math.round(
+        Math.max(10, Math.min(200, dragStartRef.current.origWidthPct + deltaWPct))
+      );
+      const nextHPct = Math.round(
+        Math.max(10, Math.min(200, dragStartRef.current.origHeightPct + deltaHPct))
+      );
+      onChangeCalibration({
+        ...calibration,
+        contentWidthPct: nextWPct,
+        contentHeightPct: nextHPct,
       });
     }
   };
@@ -336,25 +394,57 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
                 style={
                   renderContent
                     ? undefined
-                    : { fontSize: `${Math.max(4, Math.min(contentWmm, safeH * 0.72) * 0.068 * pxPerMm)}px` }
+                    : { fontSize: `${Math.max(4, Math.min(contentWmm, contentHmm * 0.72) * 0.068 * pxPerMm)}px` }
                 }
                 className="w-full overflow-hidden pointer-events-none"
               >
                 {renderContent
                   ? renderContent({
                       contentWidthMm: contentWmm,
-                      safeHeightMm: safeH,
+                      safeHeightMm: contentHmm,
                       pxPerMm,
                     })
                   : children}
               </div>
 
-              {/* Bottom-Right Resize Handle */}
+              {/* Top Edge Resize Handle */}
               <div
-                onPointerDown={handlePointerDownResize}
+                onPointerDown={(e) => handlePointerDownResize(e, 'resize-n')}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
-                title="ลากเพื่อปรับขนาดกว้าง (%)"
+                title="ลากเพื่อย่อ/ขยายจากด้านบน"
+                className="absolute -top-1 left-1/2 -translate-x-1/2 w-6 h-2 rounded-full bg-sky-500 border border-white cursor-ns-resize shadow opacity-90 hover:opacity-100"
+              />
+              {/* Bottom Edge Resize Handle */}
+              <div
+                onPointerDown={(e) => handlePointerDownResize(e, 'resize-s')}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                title="ลากเพื่อย่อ/ขยายจากด้านล่าง"
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-2 rounded-full bg-sky-500 border border-white cursor-ns-resize shadow opacity-90 hover:opacity-100"
+              />
+              {/* Left Edge Resize Handle */}
+              <div
+                onPointerDown={(e) => handlePointerDownResize(e, 'resize-w')}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                title="ลากเพื่อย่อ/ขยายจากด้านซ้าย"
+                className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-6 rounded-full bg-sky-500 border border-white cursor-ew-resize shadow opacity-90 hover:opacity-100"
+              />
+              {/* Right Edge Resize Handle */}
+              <div
+                onPointerDown={(e) => handlePointerDownResize(e, 'resize-e')}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                title="ลากเพื่อย่อ/ขยายจากด้านขวา"
+                className="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-6 rounded-full bg-sky-500 border border-white cursor-ew-resize shadow opacity-90 hover:opacity-100"
+              />
+              {/* Bottom-Right Corner Resize Handle */}
+              <div
+                onPointerDown={(e) => handlePointerDownResize(e, 'resize-se')}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                title="ลากเพื่อปรับขนาดกว้าง-สูง (%)"
                 className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 rounded-sm bg-sky-600 border border-white cursor-nwse-resize shadow"
               />
             </div>
@@ -612,6 +702,7 @@ export const PrintPositionMap: React.FC<PrintPositionMapProps> = ({
                   offsetXMm: 0,
                   offsetYMm: 0,
                   contentWidthPct: 100,
+                  contentHeightPct: 100,
                 })
               }
               title="รีเซ็ตตำแหน่ง 0,0 (100%)"

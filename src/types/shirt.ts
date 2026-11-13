@@ -65,6 +65,7 @@ export interface PrintLayoutCalibration {
   offsetXMm: number;
   offsetYMm: number;
   contentWidthPct: number;
+  contentHeightPct?: number;
   linkedPrinterId?: string;
 }
 
