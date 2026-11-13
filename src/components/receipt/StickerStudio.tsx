@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  BookmarkPlus,
   Eraser,
   FolderPlus,
   Grid,
@@ -46,13 +47,6 @@ const STICKER_QUICK_SIZES: { label: string; w: number; h: number; m: number }[] 
   { label: 'สติกเกอร์เสื้อ 50×70mm', w: 50, h: 70, m: 2 },
   { label: 'สติกเกอร์กลาง 58×80mm', w: 58, h: 80, m: 2 },
   { label: 'A4 แผ่นรวม (210×297mm)', w: 210, h: 297, m: 8 },
-];
-
-const FONT_SCALE_PRESETS: { label: string; pct: number }[] = [
-  { label: '70% เล็กมาก', pct: 70 },
-  { label: '85% กะทัดรัด', pct: 85 },
-  { label: '100% พอดีกรอบ', pct: 100 },
-  { label: '115% ใหญ่', pct: 115 },
 ];
 
 const QUICK_SIZE_CHIPS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Freesize'];
@@ -129,19 +123,6 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
 
   const patchConfig = (patch: Partial<StickerConfig>) => {
     setConfig((prev) => ({ ...prev, ...patch }));
-  };
-
-  const handleFillFromCatalogShirt = (shirtId: string) => {
-    if (!shirtId) return;
-    const found = shirts.find((s) => s.id === shirtId);
-    if (!found) return;
-    const firstSize = found.sizes[0]?.label || 'M';
-    patchConfig({
-      modelName: found.name,
-      colorName: formatColorDisplayName(found.color),
-      sizeLabel: firstSize,
-      barcodeCaption: `${found.sku}-${firstSize}`,
-    });
   };
 
   const handleSelectPaperPreset = (paperSizeId: string) => {
@@ -497,70 +478,87 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
         </div>
 
-        {/* 2. Named Sticker Sets */}
-        <div className="rounded-2xl border border-[#3a2a1f] bg-[#1a130e] p-4 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-bold text-[#f7f1e8]">
-              2. บันทึก Set สติกเกอร์ (สร้าง • แก้ไข • ลบ)
+        {/* 2. บันทึก Preset สติกเกอร์ (ขนาดกระดาษ + ข้อมูลที่กรอก รวมเป็น Preset เดียวกัน) */}
+        <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 space-y-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-base font-bold text-[#f7f1e8] flex items-center gap-2">
+                <BookmarkPlus className="w-5 h-5 text-[#e8c170]" />
+                <span>2. บันทึก Preset (ขนาดกระดาษ + ข้อมูลสติกเกอร์)</span>
+              </div>
+              <p className="text-xs text-[#a99784] mt-0.5">
+                บันทึกทั้งขนาดกระดาษ ระยะขอบ และข้อมูลรุ่น/สี/ไซส์ รวมไว้ใน Preset เดียวกัน กดครั้งเดียวโหลดได้ครบ
+              </p>
             </div>
-            <span className="text-[11px] text-[#a99784]">
-              บันทึกไว้ในเครื่อง ({stickerSets.length} Set)
+            <span className="text-xs font-mono text-[#e8c170] bg-[#291e16] px-2.5 py-1 rounded-lg border border-[#543e2d]">
+              {stickerSets.length} Preset ในเครื่อง
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex flex-wrap gap-2 pt-1">
             <input
               type="text"
               value={setNameInput}
               onChange={(e) => setSetNameInput(e.target.value)}
-              placeholder="ตั้งชื่อ Set เช่น สติกเกอร์ว่างเขียนมือ 50x70"
-              className="flex-1 min-w-[180px] px-3 py-1.5 rounded-xl bg-[#120d0a] border border-[#443326] text-xs text-[#faf5ee]"
+              placeholder="ตั้งชื่อ Preset เช่น สติกเกอร์ 50x70 รุ่น 1103 สีกรมท่า"
+              className="flex-1 min-w-[220px] px-4 py-2.5 rounded-xl bg-[#120d0a] border border-[#523d2e] text-sm text-[#ffffff] font-medium placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none"
             />
             <button
               type="button"
               onClick={handleCreateSet}
-              className="px-3 py-1.5 rounded-xl bg-[#e8c170] text-[#1c1410] text-xs font-bold flex items-center gap-1"
+              className="px-4 py-2.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm font-bold flex items-center gap-1.5 shadow transition-transform active:scale-95"
             >
-              <FolderPlus className="w-3.5 h-3.5" />
-              <span>สร้าง Set</span>
+              <FolderPlus className="w-4 h-4" />
+              <span>บันทึกเป็น Preset ใหม่</span>
             </button>
             {selectedSetId && (
               <button
                 type="button"
                 onClick={handleUpdateSet}
-                className="px-3 py-1.5 rounded-xl bg-[#291e16] border border-[#543e2d] text-[#f5da98] text-xs font-semibold flex items-center gap-1"
+                className="px-4 py-2.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[#f5da98] text-sm font-semibold flex items-center gap-1.5 transition-colors"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>อัปเดต</span>
+                <Save className="w-4 h-4" />
+                <span>บันทึกทับ Preset เดิม</span>
               </button>
             )}
           </div>
+
           {stickerSets.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {stickerSets.map((s) => (
-                <div
-                  key={s.id}
-                  className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs ${
-                    selectedSetId === s.id
-                      ? 'bg-[#e8c170]/15 border-[#e8c170] text-[#f7e1a8]'
-                      : 'bg-[#120d0a] border-[#3b2c21] text-[#d6c8b6]'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectSet(s)}
-                    className="font-medium hover:underline"
+            <div className="space-y-1.5 pt-2 border-t border-[#3a2a1f]">
+              <div className="text-xs font-semibold text-[#c8b7a4]">
+                เลือก Preset ที่บันทึกไว้:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {stickerSets.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all ${
+                      selectedSetId === s.id
+                        ? 'bg-[#e8c170]/20 border-[#e8c170] text-[#f7e1a8] font-bold shadow-md scale-102'
+                        : 'bg-[#120d0a] border-[#3b2c21] text-[#d6c8b6] hover:border-[#6a503b]'
+                    }`}
                   >
-                    {s.name} ({s.defaultCopies})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSet(s.id)}
-                    className="text-red-300/80 hover:text-red-300"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSet(s)}
+                      className="hover:underline flex items-center gap-1.5 text-left"
+                    >
+                      <span>{s.name}</span>
+                      <span className="text-[10px] opacity-75 font-mono">
+                        ({s.calibration?.paperWidthMm}×{s.calibration?.paperHeightMm ?? 'Auto'}mm)
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSet(s.id)}
+                      className="text-red-300/70 hover:text-red-300 p-0.5 rounded hover:bg-red-950/30 transition-colors"
+                      title="ลบ Preset นี้"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

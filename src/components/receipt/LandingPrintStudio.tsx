@@ -3,10 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
-  ExternalLink,
   FileImage,
   FolderPlus,
-  Layers,
   Plus,
   Printer,
   Ruler,
@@ -50,7 +48,7 @@ interface LandingPrintStudioProps {
   onUpdateDraft: (next: ReceiptDraft) => void;
   onSavePaperSizes?: (sizes: ReceiptPaperSize[]) => void;
   onOpenSizeManager: () => void;
-  onSwitchTo3DRack: () => void;
+  onSwitchTo3DRack?: () => void;
 }
 
 const TEMPLATE_KEYS: ReceiptTemplateType[] = [
@@ -70,7 +68,6 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   onUpdateDraft,
   onSavePaperSizes,
   onOpenSizeManager,
-  onSwitchTo3DRack,
 }) => {
   const [studioTab, setStudioTab] = useState<'quick' | 'sticker' | 'builder'>('sticker');
   const [printSets, setPrintSets] = useState<PrintSet[]>(() => loadPrintSets());
