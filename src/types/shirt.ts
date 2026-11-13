@@ -115,6 +115,19 @@ export interface StickerConfig {
   detailDensity?: 'auto' | 'compact' | 'normal';
 }
 
+export interface StickerPrintSettings {
+  rollCopies?: number;
+  rollLabelHeightMm?: number;
+  rollGapMm?: number;
+  printLayoutMode?: 'single' | 'grid';
+  gridColumns?: number;
+  gridGapMm?: number;
+  stickerBoxWidthMm?: number;
+  stickerBoxHeightMm?: number;
+  printerId?: string;
+  printerName?: string;
+}
+
 export interface StickerSet {
   id: string;
   name: string;
@@ -122,6 +135,7 @@ export interface StickerSet {
   paperSizeId: string;
   calibration: PrintLayoutCalibration;
   defaultCopies: number;
+  printSettings?: StickerPrintSettings;
   updatedAt: string;
 }
 

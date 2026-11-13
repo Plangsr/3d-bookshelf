@@ -11,6 +11,7 @@ import {
   FolderPlus,
   Grid,
   Printer,
+  RefreshCw,
   Save,
   Tag,
   Trash2,
@@ -65,19 +66,50 @@ const QUICK_COLOR_CHIPS = [
 ];
 const BATCH_PRESETS = [1, 10, 50, 100, 500, 1000];
 
+function buildDefaultStickerConfig(shopName: string): StickerConfig {
+  return {
+    brandHeader: shopName || '',
+    showBrandHeader: false,
+    modelName: '11106',
+    colorName: 'Pink',
+    sizeLabel: 'M',
+    writeInLineStyle: 'solid',
+    showBarcode: false,
+    barcodeDigits: '',
+    barcodeCaption: '',
+    borderRadiusMm: 2,
+    showCutBorder: true,
+    fontScalePct: 150,
+    modelFontScalePct: 100,
+    colorFontScalePct: 100,
+    sizeFontScalePct: 100,
+    modelLabelFontScalePct: 100,
+    colorLabelFontScalePct: 100,
+    sizeLabelFontScalePct: 100,
+    modelBold: true,
+    colorBold: true,
+    sizeBold: true,
+    modelLabelBold: true,
+    colorLabelBold: true,
+    sizeLabelBold: true,
+    textAlign: 'left',
+    detailDensity: 'compact',
+  };
+}
+
 export const StickerStudio: React.FC<StickerStudioProps> = ({
   shirts,
   paperSizes,
   shopProfile,
   onSavePaperSizes,
 }) => {
-  const [stickerSets, setStickerSets] = useState<StickerSet[]>(() => loadStickerSets());
+  const [stickerSets, setStickerSets] = useState<StickerSet[]>([]);
   const [selectedSetId, setSelectedSetId] = useState('');
   const [setNameInput, setSetNameInput] = useState('');
   const [selectedPrinter, setSelectedPrinter] = useState<DetectedPrinterInfo | null>(null);
   const [savedCalibrations, setSavedCalibrations] = useState<
     Record<string, PrintLayoutCalibration>
-  >(() => loadLayoutCalibrations());
+  >({});
 
   const [selectedPaperSizeId, setSelectedPaperSizeId] = useState<string>('size-30x40');
   const [calibration, setCalibration] = useState<PrintLayoutCalibration>({
@@ -93,22 +125,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     contentWidthPct: 100,
   });
 
-  const [config, setConfig] = useState<StickerConfig>(() => ({
-    brandHeader: shopProfile.shopName || '',
-    showBrandHeader: false,
-    modelName: '11106',
-    colorName: 'Pink',
-    sizeLabel: 'M',
-    writeInLineStyle: 'solid',
-    showBarcode: false,
-    barcodeDigits: '',
-    barcodeCaption: '',
-    borderRadiusMm: 2,
-    showCutBorder: true,
-    fontScalePct: 150,
-    textAlign: 'left',
-    detailDensity: 'compact',
-  }));
+  const [config, setConfig] = useState<StickerConfig>(() =>
+    buildDefaultStickerConfig(shopProfile.shopName || '')
+  );
 
   const [copies, setCopies] = useState<number>(1);
   const [rollCopies, setRollCopies] = useState<number>(5);
@@ -120,60 +139,135 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   const [stickerBoxWidthMm, setStickerBoxWidthMm] = useState<number>(30);
   const [stickerBoxHeightMm, setStickerBoxHeightMm] = useState<number>(40);
   const [activeBatchCopies, setActiveBatchCopies] = useState<number>(0);
+  const [isSyncingPreset, setIsSyncingPreset] = useState<boolean>(false);
   const [statusText, setStatusText] = useState<string>('');
+  const [statusIsError, setStatusIsError] = useState<boolean>(false);
 
-  // 1. Fetch presets & latest stickers from Google Sheets on mount so multiple devices sync seamlessly
-  useEffect(() => {
-    let isCancelled = false;
-    const fetchCrossDevicePresets = async () => {
-      try {
-        const res = await fetch('/api/stickers/presets');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && Array.isArray(data.presets) && data.presets.length > 0) {
-          if (isCancelled) return;
-          const remotePresets = data.presets as StickerSet[];
-          setStickerSets((prev) => {
-            // Merge remote presets with local presets (remote takes precedence by id)
-            const map = new Map<string, StickerSet>();
-            for (const p of prev) map.set(p.id, p);
-            for (const r of remotePresets) map.set(r.id, r);
-            const merged = Array.from(map.values());
-            saveStickerSets(merged);
-            return merged;
-          });
+  const applyStickerSetToState = (setItem: StickerSet) => {
+    setSelectedSetId(setItem.id);
+    setSetNameInput(setItem.name);
+    setConfig({
+      ...buildDefaultStickerConfig(shopProfile.shopName || ''),
+      ...setItem.config,
+    });
+    if (setItem.paperSizeId) {
+      setSelectedPaperSizeId(setItem.paperSizeId);
+    }
+    if (setItem.calibration) {
+      setCalibration({
+        ...setItem.calibration,
+      });
+    }
+    setCopies(Math.max(1, setItem.defaultCopies || 1));
 
-          // Automatically select the most recently updated preset so all devices mirror the active sticker
-          const latestPreset = remotePresets[0];
-          if (latestPreset) {
-            setSelectedSetId(latestPreset.id);
-            setSetNameInput(latestPreset.name);
-            setConfig({
-              ...latestPreset.config,
-              showBrandHeader: false,
-            });
-            if (latestPreset.calibration) {
-              setCalibration({
-                ...latestPreset.calibration,
-              });
-            }
-            if (latestPreset.defaultCopies) {
-              setCopies(latestPreset.defaultCopies);
-            }
-            if (latestPreset.paperSizeId) {
-              setSelectedPaperSizeId(latestPreset.paperSizeId);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Unable to sync presets from Google Sheets on mount:', err);
+    const ps = setItem.printSettings;
+    setRollCopies(Math.max(1, Math.min(200, ps?.rollCopies ?? 5)));
+    setRollLabelHeightMm(Math.max(10, Math.min(200, ps?.rollLabelHeightMm ?? 40)));
+    setRollGapMm(Math.max(0, Math.min(30, ps?.rollGapMm ?? 0)));
+    setPrintLayoutMode(ps?.printLayoutMode === 'grid' ? 'grid' : 'single');
+    if (ps?.gridColumns) setGridColumns(Math.max(1, ps.gridColumns));
+    if (ps?.gridGapMm !== undefined) setGridGapMm(Math.max(0, ps.gridGapMm));
+    if (ps?.stickerBoxWidthMm) setStickerBoxWidthMm(Math.max(8, ps.stickerBoxWidthMm));
+    if (ps?.stickerBoxHeightMm) setStickerBoxHeightMm(Math.max(8, ps.stickerBoxHeightMm));
+
+    const savedPrinterId = ps?.printerId || setItem.calibration?.linkedPrinterId;
+    if (savedPrinterId && ps?.printerName) {
+      setSelectedPrinter({
+        id: savedPrinterId,
+        name: ps.printerName,
+        source: 'manual',
+        status: 'จาก Preset',
+        defaultPaperSizeId: setItem.paperSizeId,
+      });
+    } else if (!savedPrinterId) {
+      setSelectedPrinter(null);
+    }
+  };
+
+  const buildCurrentStickerSet = (
+    id: string,
+    name: string,
+    calOverride?: PrintLayoutCalibration,
+    paperSizeIdOverride?: string
+  ): StickerSet => {
+    const activeCal = calOverride ?? calibration;
+    const activePaperSizeId = paperSizeIdOverride ?? selectedPaperSizeId;
+    return {
+      id,
+      name,
+      config: { ...config },
+      paperSizeId: activePaperSizeId,
+      calibration: {
+        ...activeCal,
+        ...(selectedPrinter ? { linkedPrinterId: selectedPrinter.id } : {}),
+      },
+      defaultCopies: Math.max(1, copies),
+      printSettings: {
+        rollCopies,
+        rollLabelHeightMm,
+        rollGapMm,
+        printLayoutMode,
+        gridColumns,
+        gridGapMm,
+        stickerBoxWidthMm,
+        stickerBoxHeightMm,
+        ...(selectedPrinter
+          ? { printerId: selectedPrinter.id, printerName: selectedPrinter.name }
+          : {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const syncPresetsFromSheets = async (options: { autoSelectLatest?: boolean } = {}) => {
+    setIsSyncingPreset(true);
+    try {
+      const res = await fetch('/api/stickers/presets', { cache: 'no-store' });
+      const data = (await res.json()) as {
+        presets?: StickerSet[];
+        source?: string;
+        note?: string;
+      };
+      if (!res.ok || data.source === 'error') {
+        setStatusIsError(true);
+        setStatusText(`ดึง Preset จาก Google Sheet ไม่สำเร็จ: ${data.note || res.statusText}`);
+        return;
       }
-    };
+      if (Array.isArray(data.presets)) {
+        const remotePresets = data.presets;
+        if (data.source === 'sheets') {
+          setStickerSets(remotePresets);
+          saveStickerSets(remotePresets);
+        } else if (remotePresets.length > 0) {
+          setStickerSets(remotePresets);
+          saveStickerSets(remotePresets);
+        }
 
-    void fetchCrossDevicePresets();
-    return () => {
-      isCancelled = true;
-    };
+        if (options.autoSelectLatest && remotePresets[0]) {
+          applyStickerSetToState(remotePresets[0]);
+        } else if (!options.autoSelectLatest) {
+          setStatusIsError(false);
+          setStatusText(`ซิงก์ข้อมูล ${remotePresets.length} Preset จาก Google Sheet เรียบร้อยแล้ว`);
+        }
+      }
+    } catch (err) {
+      console.warn('Unable to sync presets from Google Sheets:', err);
+      setStatusIsError(true);
+      setStatusText('เชื่อมต่อ Google Sheet เพื่อดึง Preset ไม่สำเร็จ (ใช้ข้อมูลในเครื่องชั่วคราว)');
+    } finally {
+      setIsSyncingPreset(false);
+    }
+  };
+
+  // Hydrate local presets/calibrations on client & sync presets from Google Sheets on mount
+  useEffect(() => {
+    const localSets = loadStickerSets();
+    if (localSets.length > 0) {
+      setStickerSets(localSets);
+    }
+    setSavedCalibrations(loadLayoutCalibrations());
+    void syncPresetsFromSheets({ autoSelectLatest: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -210,6 +304,53 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     setPrintLayoutMode(isA4Grid ? 'grid' : 'single');
   };
 
+  const persistPresetToSheets = async (
+    targetSet: StickerSet,
+    nextList: StickerSet[],
+    actionLabel: string
+  ) => {
+    setStickerSets(nextList);
+    saveStickerSets(nextList);
+    setSelectedSetId(targetSet.id);
+    setSetNameInput(targetSet.name);
+    setIsSyncingPreset(true);
+    setStatusIsError(false);
+    setStatusText(`กำลัง${actionLabel} "${targetSet.name}" ลง Google Sheet...`);
+
+    try {
+      const res = await fetch('/api/stickers/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(targetSet),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        persisted?: 'sheets' | 'local';
+        error?: string;
+      };
+      if (!res.ok || !data.success) {
+        setStatusIsError(true);
+        setStatusText(
+          `บันทึกในเครื่องแล้ว แต่ส่งเข้า Google Sheet ไม่สำเร็จ: ${data.error || `HTTP ${res.status}`}`
+        );
+        return;
+      }
+
+      setStatusIsError(false);
+      setStatusText(
+        data.persisted === 'sheets'
+          ? `${actionLabel} "${targetSet.name}" ลง Google Sheet (StickerPresets) สำเร็จแล้ว`
+          : `${actionLabel} "${targetSet.name}" ในเครื่องแล้ว`
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setStatusIsError(true);
+      setStatusText(`บันทึกในเครื่องแล้ว แต่ส่งเข้า Google Sheet ไม่สำเร็จ: ${msg}`);
+    } finally {
+      setIsSyncingPreset(false);
+    }
+  };
+
   const handleSaveAsNewPreset = (
     newPreset: ReceiptPaperSize,
     cal: PrintLayoutCalibration
@@ -221,135 +362,43 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       onSavePaperSizes([...paperSizes, newPreset]);
     }
     setSelectedPaperSizeId(newPreset.id);
-    setStatusText(`บันทึกขนาดสติกเกอร์ "${newPreset.name}" เป็น Preset แล้ว`);
+
+    // Also save complete StickerSet preset to Google Sheet StickerPresets so all inputs persist
+    const newSet = buildCurrentStickerSet(
+      `stk-${Date.now()}`,
+      newPreset.name,
+      cal,
+      newPreset.id
+    );
+    const nextSets = [newSet, ...stickerSets];
+    void persistPresetToSheets(newSet, nextSets, 'บันทึก Preset');
   };
 
-  const handleCreateSet = () => {
+  const handleCreateSet = async () => {
     const name =
       setNameInput.trim() ||
       `สติกเกอร์ ${config.modelName.trim() || 'เขียนเอง'} ${config.sizeLabel || ''}`.trim();
-    const newSet: StickerSet = {
-      id: `stk-${Date.now()}`,
-      name,
-      config: { ...config, showBrandHeader: false },
-      paperSizeId: selectedPaperSizeId,
-      calibration: { ...calibration },
-      defaultCopies: Math.max(1, copies),
-      updatedAt: new Date().toISOString(),
-    };
+    const newSet = buildCurrentStickerSet(`stk-${Date.now()}`, name);
     const next = [newSet, ...stickerSets];
-    setStickerSets(next);
-    saveStickerSets(next);
-    setSelectedSetId(newSet.id);
-    setSetNameInput(newSet.name);
-    setStatusText(`บันทึก Preset สติกเกอร์ "${newSet.name}" เรียบร้อยแล้ว`);
-
-    // Sync to Google Sheets automatically (both to Preset tab and Stickers history)
-    void (async () => {
-      try {
-        await Promise.allSettled([
-          fetch('/api/stickers/presets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newSet),
-          }),
-          fetch('/api/stickers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: newSet.id,
-              modelName: config.modelName,
-              colorName: config.colorName,
-              sizeLabel: config.sizeLabel,
-              showBarcode: config.showBarcode,
-              barcodeDigits: config.barcodeDigits,
-              barcodeCaption: config.barcodeCaption,
-              paperWidthMm: calibration.paperWidthMm,
-              paperHeightMm: calibration.paperHeightMm,
-              copies: Math.max(1, copies),
-              fontScalePct: config.fontScalePct ?? 100,
-              presetName: newSet.name,
-              createdAt: newSet.updatedAt,
-            }),
-          }),
-        ]);
-        setStatusText(`บันทึก Preset "${newSet.name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
-      } catch (err) {
-        console.warn('Google Sheets sync error:', err);
-      }
-    })();
+    await persistPresetToSheets(newSet, next, 'บันทึก Preset ใหม่');
   };
 
-  const handleUpdateSet = () => {
+  const handleUpdateSet = async () => {
     if (!selectedSetId) return;
     const name = setNameInput.trim() || 'Preset สติกเกอร์';
-    const next = stickerSets.map((s) =>
-      s.id === selectedSetId
-        ? {
-            ...s,
-            name,
-            config: { ...config, showBrandHeader: false },
-            paperSizeId: selectedPaperSizeId,
-            calibration: { ...calibration },
-            defaultCopies: Math.max(1, copies),
-            updatedAt: new Date().toISOString(),
-          }
-        : s
-    );
-    setStickerSets(next);
-    saveStickerSets(next);
-    setStatusText(`อัปเดต Preset สติกเกอร์ "${name}" แล้ว`);
-
-    // Sync updated preset to Google Sheets (both to Preset tab and Stickers log)
-    const updatedItem = next.find((s) => s.id === selectedSetId);
-    void (async () => {
-      try {
-        await Promise.allSettled([
-          updatedItem
-            ? fetch('/api/stickers/presets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedItem),
-              })
-            : Promise.resolve(),
-          fetch('/api/stickers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: selectedSetId,
-              modelName: config.modelName,
-              colorName: config.colorName,
-              sizeLabel: config.sizeLabel,
-              showBarcode: config.showBarcode,
-              barcodeDigits: config.barcodeDigits,
-              barcodeCaption: config.barcodeCaption,
-              paperWidthMm: calibration.paperWidthMm,
-              paperHeightMm: calibration.paperHeightMm,
-              copies: Math.max(1, copies),
-              fontScalePct: config.fontScalePct ?? 100,
-              presetName: name,
-              createdAt: new Date().toISOString(),
-            }),
-          }),
-        ]);
-        setStatusText(`อัปเดต Preset "${name}" และส่งลง Google Sheet เรียบร้อยแล้ว`);
-      } catch (err) {
-        console.warn('Google Sheets sync error:', err);
-      }
-    })();
+    const updatedSet = buildCurrentStickerSet(selectedSetId, name);
+    const withoutOld = stickerSets.filter((s) => s.id !== selectedSetId);
+    const next = [updatedSet, ...withoutOld];
+    await persistPresetToSheets(updatedSet, next, 'อัปเดต Preset');
   };
 
   const handleSelectSet = (setItem: StickerSet) => {
-    setSelectedSetId(setItem.id);
-    setSetNameInput(setItem.name);
-    setConfig({ ...setItem.config, showBrandHeader: false });
-    setSelectedPaperSizeId(setItem.paperSizeId);
-    setCalibration({ ...setItem.calibration });
-    setCopies(Math.max(1, setItem.defaultCopies || 1));
-    setStatusText(`โหลด Preset "${setItem.name}" แล้ว`);
+    applyStickerSetToState(setItem);
+    setStatusIsError(false);
+    setStatusText(`โหลด Preset "${setItem.name}" และคืนค่า Input ทั้งหมดแล้ว`);
   };
 
-  const handleDeleteSet = (id: string) => {
+  const handleDeleteSet = async (id: string) => {
     const next = stickerSets.filter((s) => s.id !== id);
     setStickerSets(next);
     saveStickerSets(next);
@@ -357,22 +406,29 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       setSelectedSetId('');
       setSetNameInput('');
     }
-    setStatusText('ลบ Preset สติกเกอร์แล้ว');
+    setIsSyncingPreset(true);
+    setStatusIsError(false);
+    setStatusText('กำลังลบ Preset จาก Google Sheet...');
 
-    void (async () => {
-      try {
-        await Promise.allSettled([
-          fetch(`/api/stickers/presets?id=${encodeURIComponent(id)}`, {
-            method: 'DELETE',
-          }),
-          fetch(`/api/stickers?id=${encodeURIComponent(id)}`, {
-            method: 'DELETE',
-          }),
-        ]);
-      } catch (err) {
-        console.warn('Google Sheets delete error:', err);
+    try {
+      const res = await fetch(`/api/stickers/presets?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) {
+        setStatusIsError(true);
+        setStatusText(`ลบ Preset ออกจาก Google Sheet ไม่สำเร็จ: ${data.error || `HTTP ${res.status}`}`);
+        return;
       }
-    })();
+      setStatusIsError(false);
+      setStatusText('ลบ Preset ออกจาก Google Sheet เรียบร้อยแล้ว');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setStatusIsError(true);
+      setStatusText(`ลบ Preset ออกจาก Google Sheet ไม่สำเร็จ: ${msg}`);
+    } finally {
+      setIsSyncingPreset(false);
+    }
   };
 
   const isRollMode = calibration.paperHeightMm === null;
@@ -389,6 +445,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
 
     applyFreePrintPageStyle(calibration, totalRollHeightMm);
     setActiveBatchCopies(safeRollCopies);
+    setStatusIsError(false);
     setStatusText(
       isRollMode
         ? `กำลังพิมพ์สติกเกอร์ต่อเนื่อง ${safeRollCopies} ดวง (โหมด Roll)...`
@@ -470,8 +527,15 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
       {/* Left Column: Sticker Fields + Blank Write-In Options + Sets + Printer + Batch */}
       <div className="lg:col-span-6 space-y-4">
         {statusText && (
-          <div className="rounded-xl border border-[#e8c170]/40 bg-[#e8c170]/10 px-4 py-2 text-xs text-[#f6dc9b]">
-            {statusText}
+          <div
+            className={`rounded-xl border px-4 py-2 text-xs flex items-center justify-between gap-2 ${
+              statusIsError
+                ? 'border-red-500/50 bg-red-950/40 text-red-200'
+                : 'border-[#e8c170]/40 bg-[#e8c170]/10 text-[#f6dc9b]'
+            }`}
+          >
+            <span>{statusText}</span>
+            {isSyncingPreset && <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />}
           </div>
         )}
 
@@ -893,21 +957,33 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           </div>
         </div>
 
-        {/* 2. บันทึก Preset สติกเกอร์ (ขนาดกระดาษ + ข้อมูลที่กรอก รวมเป็น Preset เดียวกัน) */}
+        {/* 2. บันทึก Preset สติกเกอร์ (ขนาดกระดาษ + ข้อมูลที่กรอก + ค่า Roll/ปรับขนาดทั้งหมด) */}
         <div className="rounded-2xl border border-[#e8c170]/40 bg-[#1a130e] p-5 sm:p-6 xl:p-7 space-y-3.5 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-base sm:text-lg xl:text-xl font-bold text-[#f7f1e8] flex items-center gap-2">
                 <BookmarkPlus className="w-5 h-5 xl:w-6 xl:h-6 text-[#e8c170]" />
-                <span>2. บันทึก Preset (ขนาดกระดาษ + ข้อมูลสติกเกอร์)</span>
+                <span>2. บันทึก Preset (ขนาดกระดาษ + ข้อมูล &amp; รูปแบบทั้งหมด)</span>
               </div>
               <p className="text-xs sm:text-sm text-[#a99784] mt-0.5">
-                บันทึกทั้งขนาดกระดาษ ระยะขอบ และข้อมูลรุ่น/สี/ไซส์ รวมไว้ใน Preset เดียวกัน และซิงก์ข้ามเครื่องผ่าน Google Sheet
+                บันทึกทุก Input ทั้งขนาดกระดาษ โหมด Roll ระยะขอบ จัดวาง ขนาด/ตัวหนา รุ่น-สี-ไซส์ ลง Google Sheet (StickerPresets)
               </p>
             </div>
-            <span className="text-xs sm:text-sm font-mono text-[#e8c170] bg-[#291e16] px-3 py-1.5 rounded-lg border border-[#543e2d]">
-              {stickerSets.length} Preset ในระบบ
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isSyncingPreset}
+                onClick={() => void syncPresetsFromSheets({ autoSelectLatest: false })}
+                className="px-2.5 py-1.5 rounded-lg bg-[#291e16] hover:bg-[#38291e] disabled:opacity-50 border border-[#543e2d] text-xs font-semibold text-[#d6c8b6] flex items-center gap-1.5 transition-colors"
+                title="ดึง Preset ล่าสุดจาก Google Sheet"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPreset ? 'animate-spin' : ''}`} />
+                <span>ดึงจาก Sheet</span>
+              </button>
+              <span className="text-xs sm:text-sm font-mono text-[#e8c170] bg-[#291e16] px-3 py-1.5 rounded-lg border border-[#543e2d]">
+                {stickerSets.length} Preset ในระบบ
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2.5 pt-1">
@@ -920,8 +996,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             />
             <button
               type="button"
-              onClick={handleCreateSet}
-              className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] text-[#1c1410] text-sm sm:text-base font-bold flex items-center gap-1.5 shadow transition-transform active:scale-95"
+              disabled={isSyncingPreset}
+              onClick={() => void handleCreateSet()}
+              className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] disabled:opacity-60 text-[#1c1410] text-sm sm:text-base font-bold flex items-center gap-1.5 shadow transition-transform active:scale-95"
             >
               <FolderPlus className="w-4 h-4 xl:w-5 xl:h-5" />
               <span>บันทึกเป็น Preset ใหม่</span>
@@ -929,8 +1006,9 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
             {selectedSetId && (
               <button
                 type="button"
-                onClick={handleUpdateSet}
-                className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-[#f5da98] text-sm sm:text-base font-semibold flex items-center gap-1.5 transition-colors"
+                disabled={isSyncingPreset}
+                onClick={() => void handleUpdateSet()}
+                className="px-4 py-2.5 xl:px-5 xl:py-3.5 rounded-xl bg-[#291e16] hover:bg-[#38291e] disabled:opacity-60 border border-[#543e2d] text-[#f5da98] text-sm sm:text-base font-semibold flex items-center gap-1.5 transition-colors"
               >
                 <Save className="w-4 h-4 xl:w-5 xl:h-5" />
                 <span>บันทึกทับ Preset เดิม</span>
@@ -941,7 +1019,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
           {stickerSets.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-[#3a2a1f]">
               <div className="text-xs sm:text-sm font-semibold text-[#c8b7a4]">
-                เลือก Preset ที่บันทึกไว้ (ใช้งานร่วมกันได้ทุกเครื่อง):
+                เลือก Preset ที่บันทึกไว้ (คลิกเพื่อดึง Input ทั้งหมดกลับมา):
               </div>
               <div className="flex flex-wrap gap-2 sm:gap-2.5">
                 {stickerSets.map((s) => (
@@ -960,13 +1038,18 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                     >
                       <span>{s.name}</span>
                       <span className="text-[11px] sm:text-xs opacity-75 font-mono">
-                        ({s.calibration?.paperWidthMm}×{s.calibration?.paperHeightMm ?? 'Auto'}mm)
+                        ({s.calibration?.paperWidthMm}×
+                        {s.calibration?.paperHeightMm === null
+                          ? `Roll${s.printSettings?.rollCopies ? ` ${s.printSettings.rollCopies}ดวง` : ''}`
+                          : `${s.calibration?.paperHeightMm}mm`}
+                        )
                       </span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteSet(s.id)}
-                      className="text-red-300/70 hover:text-red-300 p-0.5 rounded hover:bg-red-950/30 transition-colors"
+                      disabled={isSyncingPreset}
+                      onClick={() => void handleDeleteSet(s.id)}
+                      className="text-red-300/70 hover:text-red-300 disabled:opacity-40 p-0.5 rounded hover:bg-red-950/30 transition-colors"
                       title="ลบ Preset นี้"
                     >
                       <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

@@ -53,6 +53,64 @@ export function getGoogleSheetsClient() {
   return google.sheets({ version: 'v4', auth });
 }
 
+export async function ensureSheetTabWithHeaders(
+  sheetId: string,
+  tabTitle: string,
+  headers: string[]
+): Promise<void> {
+  const sheets = getGoogleSheetsClient();
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: 'sheets.properties',
+  });
+
+  const existingTab = meta.data.sheets?.find(
+    (sheet) => sheet.properties?.title === tabTitle
+  );
+
+  if (!existingTab) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: tabTitle,
+              },
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  const endCol = String.fromCharCode(64 + Math.min(26, Math.max(1, headers.length)));
+  const headerRange = `${tabTitle}!A1:${endCol}1`;
+  const existingHeaderRes = await sheets.spreadsheets.values
+    .get({
+      spreadsheetId: sheetId,
+      range: headerRange,
+    })
+    .catch(() => null);
+
+  const currentRow = existingHeaderRes?.data.values?.[0] ?? [];
+  const needsHeaderUpdate =
+    currentRow.length < headers.length ||
+    headers.some((h, idx) => String(currentRow[idx] ?? '').trim() !== h);
+
+  if (needsHeaderUpdate) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [headers],
+      },
+    });
+  }
+}
+
 export async function deleteSheetRowById(
   sheetId: string,
   tabTitle: string,
@@ -68,15 +126,18 @@ export async function deleteSheetRowById(
   });
 
   const rows = idLookup.data.values || [];
-  const rowIndex = rows.findIndex((row, idx) => {
+  const matchingIndices: number[] = [];
+  rows.forEach((row, idx) => {
     const cellValue = String(row[0] ?? '').trim();
     if (idx === 0 && cellValue.toLowerCase() === 'id') {
-      return false;
+      return;
     }
-    return cellValue === trimmedId;
+    if (cellValue === trimmedId) {
+      matchingIndices.push(idx);
+    }
   });
 
-  if (rowIndex === -1) {
+  if (matchingIndices.length === 0) {
     return false;
   }
 
@@ -94,21 +155,24 @@ export async function deleteSheetRowById(
     return false;
   }
 
+  // Delete in descending row order so earlier deletions never shift subsequent indices.
+  const requests = matchingIndices
+    .sort((a, b) => b - a)
+    .map((rowIndex) => ({
+      deleteDimension: {
+        range: {
+          sheetId: tabSheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex,
+          endIndex: rowIndex + 1,
+        },
+      },
+    }));
+
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: sheetId,
     requestBody: {
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId: tabSheetId,
-              dimension: 'ROWS',
-              startIndex: rowIndex,
-              endIndex: rowIndex + 1,
-            },
-          },
-        },
-      ],
+      requests,
     },
   });
 

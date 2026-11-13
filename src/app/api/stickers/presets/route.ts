@@ -1,34 +1,67 @@
 import { NextResponse } from 'next/server';
 import {
   deleteSheetRowById,
+  ensureSheetTabWithHeaders,
   getGoogleSheetsClient,
   getSheetsDatabaseConfig,
 } from '@/lib/googleSheets';
-import type { StickerSet } from '@/types/shirt';
+import type { StickerConfig, StickerPrintSettings, StickerSet } from '@/types/shirt';
 
-const STICKER_PRESETS_RANGE = 'StickerPresets!A:N';
-const STICKER_PRESETS_DATA_RANGE = 'StickerPresets!A2:N';
+const STICKER_PRESETS_TAB = 'StickerPresets';
+const STICKER_PRESETS_RANGE = 'StickerPresets!A:Q';
+const STICKER_PRESETS_HEADERS = [
+  'id',
+  'name',
+  'modelName',
+  'colorName',
+  'sizeLabel',
+  'showBarcode',
+  'barcodeDigits',
+  'barcodeCaption',
+  'paperWidthMm',
+  'paperHeightMm',
+  'defaultCopies',
+  'fontScalePct',
+  'calibrationJson',
+  'updatedAt',
+  'paperSizeId',
+  'configJson',
+  'printSettingsJson',
+];
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseJsonObject<T>(raw: string | undefined): Partial<T> | null {
+  if (!raw || !raw.trim().startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) ? (parsed as Partial<T>) : null;
+  } catch {
+    return null;
+  }
 }
 
 function stickerSetToSheetRow(set: StickerSet): (string | number | boolean)[] {
   return [
     set.id,
     set.name,
-    set.config.modelName,
-    set.config.colorName,
-    set.config.sizeLabel,
-    set.config.showBarcode,
-    set.config.barcodeDigits,
-    set.config.barcodeCaption,
+    set.config.modelName ?? '',
+    set.config.colorName ?? '',
+    set.config.sizeLabel ?? '',
+    Boolean(set.config.showBarcode),
+    set.config.barcodeDigits ?? '',
+    set.config.barcodeCaption ?? '',
     set.calibration?.paperWidthMm || 30,
     set.calibration?.paperHeightMm === null ? '' : set.calibration?.paperHeightMm ?? 40,
     set.defaultCopies || 1,
-    set.config.fontScalePct || 100,
+    set.config.fontScalePct ?? 100,
     JSON.stringify(set.calibration || {}),
     set.updatedAt || new Date().toISOString(),
+    set.paperSizeId || '',
+    JSON.stringify(set.config || {}),
+    JSON.stringify(set.printSettings || {}),
   ];
 }
 
@@ -51,38 +84,44 @@ function sheetRowToStickerSet(row: string[]): StickerSet | null {
     contentWidthPct: 100,
   };
 
-  if (row[12] && row[12].trim().startsWith('{')) {
-    try {
-      const parsed = JSON.parse(row[12]);
-      if (isPlainObject(parsed)) {
-        calibration = { ...calibration, ...parsed };
-      }
-    } catch {
-      // Keep default calibration
-    }
+  const parsedCal = parseJsonObject<typeof calibration>(row[12]);
+  if (parsedCal) {
+    calibration = { ...calibration, ...parsedCal };
   }
+
+  const baseConfig: StickerConfig = {
+    brandHeader: '',
+    showBrandHeader: false,
+    modelName: String(row[2] ?? '').trim(),
+    colorName: String(row[3] ?? '').trim(),
+    sizeLabel: String(row[4] ?? '').trim(),
+    writeInLineStyle: 'solid',
+    showBarcode: String(row[5] ?? '').toLowerCase() === 'true',
+    barcodeDigits: String(row[6] ?? '').trim(),
+    barcodeCaption: String(row[7] ?? '').trim(),
+    borderRadiusMm: 2,
+    showCutBorder: true,
+    fontScalePct: Number(row[11]) || 100,
+    textAlign: 'left',
+    detailDensity: 'auto',
+  };
+
+  const parsedConfig = parseJsonObject<StickerConfig>(row[15]);
+  const mergedConfig: StickerConfig = parsedConfig
+    ? { ...baseConfig, ...parsedConfig }
+    : baseConfig;
+
+  const parsedPrintSettings = parseJsonObject<StickerPrintSettings>(row[16]) ?? undefined;
+  const rawPaperSizeId = String(row[14] ?? '').trim();
 
   return {
     id,
     name: String(row[1] ?? '').trim() || 'Preset สติกเกอร์',
-    paperSizeId: `preset-${id}`,
-    config: {
-      brandHeader: '',
-      showBrandHeader: false,
-      modelName: String(row[2] ?? '').trim(),
-      colorName: String(row[3] ?? '').trim(),
-      sizeLabel: String(row[4] ?? '').trim(),
-      writeInLineStyle: 'solid',
-      showBarcode: String(row[5] ?? '').toLowerCase() === 'true',
-      barcodeDigits: String(row[6] ?? '').trim(),
-      barcodeCaption: String(row[7] ?? '').trim(),
-      borderRadiusMm: 2,
-      showCutBorder: true,
-      fontScalePct: Number(row[11]) || 100,
-      detailDensity: 'auto',
-    },
+    paperSizeId: rawPaperSizeId || `preset-${id}`,
+    config: mergedConfig,
     calibration,
     defaultCopies: Number(row[10]) || 1,
+    ...(parsedPrintSettings ? { printSettings: parsedPrintSettings as StickerPrintSettings } : {}),
     updatedAt: String(row[13] ?? '').trim() || new Date().toISOString(),
   };
 }
@@ -92,35 +131,63 @@ export async function GET(request?: Request) {
 
   const config = getSheetsDatabaseConfig();
   if (!config) {
-    return NextResponse.json({
-      presets: [],
-      note: 'No sheets config found',
-    });
+    return NextResponse.json(
+      {
+        presets: [],
+        source: 'local',
+        note: 'No sheets config found',
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   }
 
   try {
     const sheets = getGoogleSheetsClient();
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: config.sheetId,
-      range: STICKER_PRESETS_DATA_RANGE,
-    });
+    const res = await sheets.spreadsheets.values
+      .get({
+        spreadsheetId: config.sheetId,
+        range: STICKER_PRESETS_RANGE,
+      })
+      .catch(async () => {
+        await ensureSheetTabWithHeaders(
+          config.sheetId,
+          STICKER_PRESETS_TAB,
+          STICKER_PRESETS_HEADERS
+        );
+        return sheets.spreadsheets.values.get({
+          spreadsheetId: config.sheetId,
+          range: STICKER_PRESETS_RANGE,
+        });
+      });
 
-    const rows = (res.data.values || []) as string[][];
-    const presets = rows
+    const allRows = (res.data.values || []) as string[][];
+    const presets = allRows
       .map((row) => sheetRowToStickerSet(row))
-      .filter((rec): rec is StickerSet => rec !== null);
+      .filter((rec): rec is StickerSet => rec !== null)
+      .sort((a, b) => {
+        const ta = Date.parse(a.updatedAt) || 0;
+        const tb = Date.parse(b.updatedAt) || 0;
+        return tb - ta;
+      });
 
-    return NextResponse.json({
-      presets,
-      source: 'sheets',
-    });
+    return NextResponse.json(
+      {
+        presets,
+        source: 'sheets',
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unable to read StickerPresets sheet';
     console.warn('StickerPresets sheet read error:', message);
-    return NextResponse.json({
-      presets: [],
-      note: message,
-    });
+    return NextResponse.json(
+      {
+        presets: [],
+        source: 'error',
+        note: message,
+      },
+      { status: 502, headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   }
 }
 
@@ -154,14 +221,19 @@ export async function POST(req: Request) {
   const config = getSheetsDatabaseConfig();
   if (config) {
     try {
+      await ensureSheetTabWithHeaders(
+        config.sheetId,
+        STICKER_PRESETS_TAB,
+        STICKER_PRESETS_HEADERS
+      );
       const sheets = getGoogleSheetsClient();
-      // Delete existing row with this ID if exists so it acts like upsert
-      await deleteSheetRowById(config.sheetId, 'StickerPresets', setItem.id).catch(() => false);
+      // Delete any existing rows with this ID so POST acts as an idempotent upsert.
+      await deleteSheetRowById(config.sheetId, STICKER_PRESETS_TAB, setItem.id);
 
       await sheets.spreadsheets.values.append({
         spreadsheetId: config.sheetId,
         range: STICKER_PRESETS_RANGE,
-        valueInputOption: 'USER_ENTERED',
+        valueInputOption: 'RAW',
         requestBody: {
           values: [stickerSetToSheetRow(setItem)],
         },
@@ -214,7 +286,7 @@ export async function DELETE(req: Request) {
   const config = getSheetsDatabaseConfig();
   if (config) {
     try {
-      await deleteSheetRowById(config.sheetId, 'StickerPresets', id);
+      await deleteSheetRowById(config.sheetId, STICKER_PRESETS_TAB, id);
       persisted = 'sheets';
     } catch (sheetErr: unknown) {
       const message =
