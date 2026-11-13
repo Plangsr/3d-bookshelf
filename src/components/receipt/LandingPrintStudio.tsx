@@ -31,6 +31,7 @@ import type {
   ShopProfile,
   VatMode,
 } from '@/types/shirt';
+import { QuickUploadPrinter } from './QuickUploadPrinter';
 import { ReceiptPreview } from './ReceiptPreview';
 
 function applyDynamicPrintPageStyle(paperSize: ReceiptPaperSize): void {
@@ -86,6 +87,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
   onOpenSizeManager,
   onSwitchTo3DRack,
 }) => {
+  const [studioTab, setStudioTab] = useState<'quick' | 'builder'>('quick');
   const [printSets, setPrintSets] = useState<PrintSet[]>(() => loadPrintSets());
   const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [setNameInput, setSetNameInput] = useState<string>('');
@@ -344,7 +346,40 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Mode Tabs */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setStudioTab('quick')}
+            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+              studioTab === 'quick'
+                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
+            }`}
+          >
+            พิมพ์ด่วนจากไฟล์ใบเสร็จของร้าน (เลือกขนาด Preset)
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudioTab('builder')}
+            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+              studioTab === 'builder'
+                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170]'
+                : 'bg-[#1a130e] text-[#d6c8b6] border-[#3a2a1f] hover:border-[#6a503b]'
+            }`}
+          >
+            สร้างใบเสร็จจากรายการเสื้อ &amp; Set การพิมพ์
+          </button>
+        </div>
+
+        {studioTab === 'quick' ? (
+          <QuickUploadPrinter
+            paperSizes={paperSizes}
+            defaultPaperSizeId={activePaperSize.id}
+            onOpenSizeManager={onOpenSizeManager}
+          />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left Column: Upload + Print Sets + Form + Batch Print */}
           <div className="lg:col-span-7 space-y-4">
             {/* 1. Upload Slip Card */}
@@ -878,6 +913,7 @@ export const LandingPrintStudio: React.FC<LandingPrintStudioProps> = ({
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Print-only Batch Container (hidden on screen, paginated on print) */}
