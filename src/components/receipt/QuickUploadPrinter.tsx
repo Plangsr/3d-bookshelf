@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FileImage, Printer, Ruler, Trash2, Upload } from 'lucide-react';
+import { FileImage, FileText, Printer, Ruler, Trash2, Upload } from 'lucide-react';
 import type { ReceiptPaperSize } from '@/types/shirt';
 
 interface UploadedDocItem {
   id: string;
   name: string;
+  kind: 'image' | 'pdf';
   dataUrl: string;
   paperSizeId: string;
   copies: number;
@@ -55,13 +56,33 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     Array.from(fileList).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
+      const isPdf =
+        file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = file.type.startsWith('image/');
+      if (!isPdf && !isImage) return;
+
+      if (isPdf) {
+        const objectUrl = URL.createObjectURL(file);
+        const newItem: UploadedDocItem = {
+          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name,
+          kind: 'pdf',
+          dataUrl: objectUrl,
+          paperSizeId: defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm',
+          copies: 1,
+        };
+        setDocs((prev) => [newItem, ...prev]);
+        setSelectedDocId((curr) => curr || newItem.id);
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result !== 'string') return;
         const newItem: UploadedDocItem = {
           id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: file.name,
+          kind: 'image',
           dataUrl: reader.result,
           paperSizeId: defaultPaperSizeId || paperSizes[0]?.id || 'size-80mm',
           copies: 1,
@@ -86,6 +107,29 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
     const paper = paperSizes.find((p) => p.id === doc.paperSizeId) ?? paperSizes[0];
     if (!paper) return;
     applyDynamicPageStyle(paper);
+
+    if (doc.kind === 'pdf') {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.src = doc.dataUrl;
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch {
+          window.open(doc.dataUrl, '_blank');
+        }
+        setTimeout(() => iframe.remove(), 60000);
+      };
+      document.body.appendChild(iframe);
+      return;
+    }
+
     setPrintingDoc(doc);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -149,7 +193,7 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
                 <span>เลือกไฟล์ใบเสร็จ</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf,application/pdf"
                   multiple
                   className="hidden"
                   onChange={(e) => {
@@ -192,12 +236,19 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={doc.dataUrl}
-                        alt={doc.name}
-                        className="w-12 h-14 object-cover rounded border border-[#4a3829] bg-white shrink-0"
-                      />
+                      {doc.kind === 'pdf' ? (
+                        <div className="w-12 h-14 rounded border border-[#4a3829] bg-[#291e16] flex flex-col items-center justify-center text-[#e8c170] shrink-0">
+                          <FileText className="w-5 h-5" />
+                          <span className="text-[9px] font-bold mt-0.5">PDF</span>
+                        </div>
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={doc.dataUrl}
+                          alt={doc.name}
+                          className="w-12 h-14 object-cover rounded border border-[#4a3829] bg-white shrink-0"
+                        />
+                      )}
                       <div className="flex-1 min-w-[180px] space-y-1.5">
                         <div className="text-xs font-semibold text-[#f5efe6] truncate">
                           {doc.name}
@@ -290,12 +341,20 @@ export const QuickUploadPrinter: React.FC<QuickUploadPrinterProps> = ({
               }}
               className="bg-white shadow-2xl border border-neutral-200 flex items-start justify-center"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeDoc.dataUrl}
-                alt={activeDoc.name}
-                className="w-full h-auto object-contain"
-              />
+              {activeDoc.kind === 'pdf' ? (
+                <iframe
+                  src={activeDoc.dataUrl}
+                  title={activeDoc.name}
+                  className="w-full h-[60vh] border-0 bg-white"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={activeDoc.dataUrl}
+                  alt={activeDoc.name}
+                  className="w-full h-auto object-contain"
+                />
+              )}
             </div>
           ) : (
             <div className="py-16 text-xs text-[#8f7e6c] text-center">
