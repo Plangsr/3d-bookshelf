@@ -104,12 +104,12 @@ function computeStickerMetrics(
 
   // For label printers like Xprinter XP-490B (203 DPI, 26mm - 108mm print width),
   // boost font scale so text fills the label boldly and cleanly
-  const widthBudgetMm = effW * (isCompact ? 0.145 : 0.160);
-  const heightBudgetMm = (effH * 0.98) / Math.max(3.2, emDemand);
+  const widthBudgetMm = effW * (isCompact ? 0.170 : 0.185);
+  const heightBudgetMm = (effH * 0.98) / Math.max(2.6, emDemand);
   const userScale = Math.max(0.45, Math.min(5.0, (config.fontScalePct ?? 100) / 100));
 
   const rawFontMm = Math.min(widthBudgetMm, heightBudgetMm) * userScale;
-  const baseFontMm = Math.max(1.5, Math.min(22.0, rawFontMm));
+  const baseFontMm = Math.max(1.8, Math.min(26.0, rawFontMm));
   const safeRadiusMm = Math.min(config.borderRadiusMm, +(effW * 0.09).toFixed(2));
 
   return {
@@ -199,84 +199,78 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
         </div>
       )}
 
-      {/* Main Fields: รุ่น / สี / ไซส์ */}
+      {/* Main Fields: MODEL / COLOR / SIZE */}
       <div className={fieldGapClass}>
-        {/* รุ่น (MODEL) */}
+        {/* MODEL */}
         <div className={textAlignClass}>
-          <div
-            className={`${
-              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
-            } font-bold text-neutral-600`}
-          >
-            รุ่น (MODEL):
-          </div>
-          {config.modelName.trim() ? (
-            <div
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span
               className={`${
-                metrics.isCompact ? 'text-[1.28em]' : 'text-[1.40em]'
-              } font-black tracking-tight text-black mt-[0.04em] break-words`}
+                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
+              } font-black text-neutral-800 tracking-tight`}
             >
-              {config.modelName.trim()}
-            </div>
-          ) : (
-            <div
-              className={`${
-                metrics.isCompact ? 'h-[1.05em]' : 'h-[1.35em]'
-              } w-full mt-[0.12em] ${borderLineClass}`}
-            />
-          )}
+              MODEL:
+            </span>
+            {config.modelName.trim() ? (
+              <span
+                className={`${
+                  metrics.isCompact ? 'text-[1.35em]' : 'text-[1.50em]'
+                } font-black tracking-tight text-black break-words`}
+              >
+                {config.modelName.trim()}
+              </span>
+            ) : (
+              <span className="flex-1 border-b-2 border-neutral-800 inline-block min-w-[3em] h-[0.9em]" />
+            )}
+          </div>
         </div>
 
-        {/* สี (COLOR) */}
+        {/* COLOR */}
         <div className={textAlignClass}>
-          <div
-            className={`${
-              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
-            } font-bold text-neutral-600`}
-          >
-            สี (COLOR):
-          </div>
-          {config.colorName.trim() ? (
-            <div
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span
               className={`${
-                metrics.isCompact ? 'text-[1.18em]' : 'text-[1.30em]'
-              } font-black text-[#1d222b] mt-[0.04em] break-words`}
+                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
+              } font-black text-neutral-800 tracking-tight`}
             >
-              {config.colorName.trim()}
-            </div>
-          ) : (
-            <div
-              className={`${
-                metrics.isCompact ? 'h-[1.05em]' : 'h-[1.35em]'
-              } w-full mt-[0.12em] ${borderLineClass}`}
-            />
-          )}
+              COLOR:
+            </span>
+            {config.colorName.trim() ? (
+              <span
+                className={`${
+                  metrics.isCompact ? 'text-[1.20em]' : 'text-[1.35em]'
+                } font-black text-black break-words`}
+              >
+                {config.colorName.trim()}
+              </span>
+            ) : (
+              <span className="flex-1 border-b-2 border-neutral-800 inline-block min-w-[3em] h-[0.9em]" />
+            )}
+          </div>
         </div>
 
-        {/* ไซส์ (SIZE) */}
+        {/* SIZE */}
         <div className={textAlignClass}>
-          <div
-            className={`${
-              metrics.isCompact ? 'text-[0.66em]' : 'text-[0.74em]'
-            } font-bold text-neutral-600`}
-          >
-            ไซส์ (SIZE):
-          </div>
-          {config.sizeLabel.trim() ? (
-            <div
-              className={`${textAlignClass} ${
-                metrics.isCompact ? 'text-[2.65em]' : 'text-[3.2em]'
-              } font-black text-black tracking-tight leading-none py-[0.04em]`}
-            >
-              {config.sizeLabel.trim()}
-            </div>
-          ) : (
-            <div
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span
               className={`${
-                metrics.isCompact ? 'h-[1.45em]' : 'h-[1.8em]'
-              } w-full mt-[0.12em] ${borderLineClass}`}
-            />
-          )}
+                metrics.isCompact ? 'text-[0.74em]' : 'text-[0.82em]'
+              } font-black text-neutral-800 tracking-tight`}
+            >
+              SIZE:
+            </span>
+            {config.sizeLabel.trim() ? (
+              <span
+                className={`${
+                  metrics.isCompact ? 'text-[2.2em]' : 'text-[2.6em]'
+                } font-black text-black tracking-tight leading-none`}
+              >
+                {config.sizeLabel.trim()}
+              </span>
+            ) : (
+              <span className="flex-1 border-b-2 border-neutral-800 inline-block min-w-[3em] h-[0.9em]" />
+            )}
+          </div>
         </div>
       </div>
 

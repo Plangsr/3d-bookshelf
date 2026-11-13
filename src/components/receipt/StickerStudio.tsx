@@ -105,7 +105,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     borderRadiusMm: 2,
     showCutBorder: true,
     fontScalePct: 150,
-    textAlign: 'center',
+    textAlign: 'left',
     detailDensity: 'compact',
   }));
 
