@@ -733,7 +733,13 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                   (config.sizeFontScalePct ?? 100) !== 100 ||
                   (config.modelLabelFontScalePct ?? 100) !== 100 ||
                   (config.colorLabelFontScalePct ?? 100) !== 100 ||
-                  (config.sizeLabelFontScalePct ?? 100) !== 100) && (
+                  (config.sizeLabelFontScalePct ?? 100) !== 100 ||
+                  config.modelBold === false ||
+                  config.colorBold === false ||
+                  config.sizeBold === false ||
+                  config.modelLabelBold === false ||
+                  config.colorLabelBold === false ||
+                  config.sizeLabelBold === false) && (
                   <button
                     type="button"
                     onClick={() =>
@@ -744,6 +750,12 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                         modelLabelFontScalePct: 100,
                         colorLabelFontScalePct: 100,
                         sizeLabelFontScalePct: 100,
+                        modelBold: true,
+                        colorBold: true,
+                        sizeBold: true,
+                        modelLabelBold: true,
+                        colorLabelBold: true,
+                        sizeLabelBold: true,
                       })
                     }
                     className="text-[11px] sm:text-xs text-[#cbbba9] hover:text-[#e8c170] underline"
@@ -761,32 +773,56 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                       prefix: 'MODEL:',
                       valueKey: 'modelFontScalePct',
                       labelKey: 'modelLabelFontScalePct',
+                      valueBoldKey: 'modelBold',
+                      labelBoldKey: 'modelLabelBold',
                     },
                     {
                       title: 'สี (COLOR)',
                       prefix: 'COLOR:',
                       valueKey: 'colorFontScalePct',
                       labelKey: 'colorLabelFontScalePct',
+                      valueBoldKey: 'colorBold',
+                      labelBoldKey: 'colorLabelBold',
                     },
                     {
                       title: 'ไซส์ (SIZE)',
                       prefix: 'SIZE:',
                       valueKey: 'sizeFontScalePct',
                       labelKey: 'sizeLabelFontScalePct',
+                      valueBoldKey: 'sizeBold',
+                      labelBoldKey: 'sizeLabelBold',
                     },
                   ] as const
                 ).map((item) => {
                   const valPct = config[item.valueKey] ?? 100;
                   const lblPct = config[item.labelKey] ?? 100;
+                  const isValBold = config[item.valueBoldKey] !== false;
+                  const isLblBold = config[item.labelBoldKey] !== false;
                   return (
                     <div
                       key={item.valueKey}
                       className="rounded-lg border border-[#2c1f16] bg-[#18110c] p-2.5 space-y-2"
                     >
-                      <label className="block space-y-1">
-                        <div className="flex items-center justify-between text-xs text-[#d6c8b6]">
-                          <span>{item.title}</span>
-                          <span className="font-mono font-bold text-[#e8c170]">{valPct}%</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1.5 text-xs text-[#d6c8b6]">
+                          <span className="truncate">{item.title}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-mono font-bold text-[#e8c170]">{valPct}%</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                patchConfig({ [item.valueBoldKey]: !isValBold })
+                              }
+                              className={`w-6 h-6 rounded border text-xs transition-colors flex items-center justify-center ${
+                                isValBold
+                                  ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-black'
+                                  : 'bg-[#291e16] text-[#8e7a68] border-[#4a3728] font-normal hover:text-white'
+                              }`}
+                              title={`ตัวหนาข้อความที่กรอก (${item.title})`}
+                            >
+                              B
+                            </button>
+                          </div>
                         </div>
                         <input
                           type="range"
@@ -799,7 +835,7 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                           }
                           className="w-full accent-[#e8c170]"
                         />
-                      </label>
+                      </div>
 
                       <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#2c1f16]">
                         <span className="text-[11px] text-[#a99784] truncate">
@@ -832,6 +868,20 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                             title={`เพิ่มขนาด ${item.prefix}`}
                           >
                             +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchConfig({ [item.labelBoldKey]: !isLblBold })
+                            }
+                            className={`w-6 h-6 rounded border text-xs transition-colors flex items-center justify-center ${
+                              isLblBold
+                                ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-black'
+                                : 'bg-[#291e16] text-[#8e7a68] border-[#4a3728] font-normal hover:text-white'
+                            }`}
+                            title={`ตัวหนาหัวข้อ (${item.prefix})`}
+                          >
+                            B
                           </button>
                         </div>
                       </div>

@@ -102,6 +102,13 @@ export interface StickerConfig {
   modelLabelFontScalePct?: number;
   colorLabelFontScalePct?: number;
   sizeLabelFontScalePct?: number;
+  /** Individual bold toggles for Input values and Title prefixes (default true) */
+  modelBold?: boolean;
+  colorBold?: boolean;
+  sizeBold?: boolean;
+  modelLabelBold?: boolean;
+  colorLabelBold?: boolean;
+  sizeLabelBold?: boolean;
   /** Text alignment across sticker fields: 'left' | 'center' | 'right' */
   textAlign?: 'left' | 'center' | 'right';
   /** Detail spacing mode: 'auto' shrinks padding/gaps when sticker <= 36x46mm */

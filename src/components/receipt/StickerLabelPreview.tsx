@@ -233,14 +233,18 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               style={{ fontSize: `${modelLabelEm.toFixed(3)}em` }}
-              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
+              className={`${
+                config.modelLabelBold !== false ? 'font-black' : 'font-normal'
+              } text-neutral-800 tracking-tight whitespace-nowrap leading-none`}
             >
               MODEL:
             </span>
             {config.modelName.trim() ? (
               <span
                 style={{ fontSize: `${modelValueEm.toFixed(3)}em` }}
-                className="font-black tracking-tight text-black break-words leading-none"
+                className={`${
+                  config.modelBold !== false ? 'font-black' : 'font-normal'
+                } tracking-tight text-black break-words leading-none`}
               >
                 {config.modelName.trim()}
               </span>
@@ -255,14 +259,18 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               style={{ fontSize: `${colorLabelEm.toFixed(3)}em` }}
-              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
+              className={`${
+                config.colorLabelBold !== false ? 'font-black' : 'font-normal'
+              } text-neutral-800 tracking-tight whitespace-nowrap leading-none`}
             >
               COLOR:
             </span>
             {config.colorName.trim() ? (
               <span
                 style={{ fontSize: `${colorValueEm.toFixed(3)}em` }}
-                className="font-black text-black break-words leading-none"
+                className={`${
+                  config.colorBold !== false ? 'font-black' : 'font-normal'
+                } text-black break-words leading-none`}
               >
                 {config.colorName.trim()}
               </span>
@@ -277,14 +285,18 @@ export const StickerLabelPreview: React.FC<StickerLabelPreviewProps> = ({
           <div className={`flex items-baseline gap-1.5 flex-wrap ${flexJustifyClass}`}>
             <span
               style={{ fontSize: `${sizeLabelEm.toFixed(3)}em` }}
-              className="font-black text-neutral-800 tracking-tight whitespace-nowrap leading-none"
+              className={`${
+                config.sizeLabelBold !== false ? 'font-black' : 'font-normal'
+              } text-neutral-800 tracking-tight whitespace-nowrap leading-none`}
             >
               SIZE:
             </span>
             {config.sizeLabel.trim() ? (
               <span
                 style={{ fontSize: `${sizeValueEm.toFixed(3)}em` }}
-                className="font-black text-black tracking-tight leading-none"
+                className={`${
+                  config.sizeBold !== false ? 'font-black' : 'font-normal'
+                } text-black tracking-tight leading-none`}
               >
                 {config.sizeLabel.trim()}
               </span>
