@@ -5,8 +5,70 @@ import {
   getSheetsDatabaseConfig,
 } from '@/lib/googleSheets';
 
+const STICKERS_SHEET_TAB = 'Stickers';
 const STICKERS_SHEET_RANGE = 'Stickers!A:N';
 const STICKERS_DATA_RANGE = 'Stickers!A2:N';
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+async function pruneExpiredStickerLogs(sheetId: string): Promise<number> {
+  const sheets = getGoogleSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: STICKERS_SHEET_RANGE,
+  });
+
+  const rows = (res.data.values || []) as string[][];
+  const cutoffMs = Date.now() - ONE_DAY_MS;
+  const expiredRowIndices: number[] = [];
+
+  rows.forEach((row, idx) => {
+    const id = String(row[0] ?? '').trim();
+    if (idx === 0 && id.toLowerCase() === 'id') {
+      return;
+    }
+    if (!id) return;
+    const createdAtMs = Date.parse(String(row[12] ?? '').trim());
+    if (!Number.isFinite(createdAtMs) || createdAtMs < cutoffMs) {
+      expiredRowIndices.push(idx);
+    }
+  });
+
+  if (expiredRowIndices.length === 0) {
+    return 0;
+  }
+
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: 'sheets.properties',
+  });
+  const targetTab = meta.data.sheets?.find(
+    (sheet) => sheet.properties?.title === STICKERS_SHEET_TAB
+  );
+  const tabSheetId = targetTab?.properties?.sheetId;
+  if (tabSheetId === undefined || tabSheetId === null) {
+    return 0;
+  }
+
+  const requests = expiredRowIndices
+    .sort((a, b) => b - a)
+    .map((rowIndex) => ({
+      deleteDimension: {
+        range: {
+          sheetId: tabSheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex,
+          endIndex: rowIndex + 1,
+        },
+      },
+    }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: { requests },
+  });
+
+  return expiredRowIndices.length;
+}
 
 export interface StickerSheetRecord {
   id: string;
@@ -84,6 +146,10 @@ export async function GET(request?: Request) {
   }
 
   try {
+    await pruneExpiredStickerLogs(config.sheetId).catch((err) => {
+      console.warn('Stickers prune warning:', err);
+    });
+
     const sheets = getGoogleSheetsClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: config.sheetId,

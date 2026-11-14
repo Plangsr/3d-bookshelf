@@ -267,6 +267,8 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     }
     setSavedCalibrations(loadLayoutCalibrations());
     void syncPresetsFromSheets({ autoSelectLatest: true });
+    // Prune sticker print logs older than 1 day on entry (StickerPresets stays forever)
+    void fetch('/api/stickers', { cache: 'no-store' }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
