@@ -142,6 +142,10 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
   const [isSyncingPreset, setIsSyncingPreset] = useState<boolean>(false);
   const [statusText, setStatusText] = useState<string>('');
   const [statusIsError, setStatusIsError] = useState<boolean>(false);
+  const [sheetColors, setSheetColors] = useState<string[]>(QUICK_COLOR_CHIPS);
+  const [isAddingColor, setIsAddingColor] = useState<boolean>(false);
+  const [newColorInput, setNewColorInput] = useState<string>('');
+  const [isSavingColor, setIsSavingColor] = useState<boolean>(false);
 
   const applyStickerSetToState = (setItem: StickerSet) => {
     setSelectedSetId(setItem.id);
@@ -269,6 +273,20 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
     void syncPresetsFromSheets({ autoSelectLatest: true });
     // Prune sticker print logs older than 1 day on entry (StickerPresets stays forever)
     void fetch('/api/stickers', { cache: 'no-store' }).catch(() => {});
+    // Fetch color list from Google Sheet (Colors tab)
+    void (async () => {
+      try {
+        const res = await fetch('/api/colors', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { colors?: { name: string }[] };
+        if (Array.isArray(data.colors) && data.colors.length > 0) {
+          const fromSheet = data.colors.map((c) => c.name).filter(Boolean);
+          setSheetColors(Array.from(new Set([...fromSheet, ...QUICK_COLOR_CHIPS])));
+        }
+      } catch {
+        // Keep default color chips
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -280,6 +298,42 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
 
   const patchConfig = (patch: Partial<StickerConfig>) => {
     setConfig((prev) => ({ ...prev, ...patch }));
+  };
+
+  const handleSaveNewColor = async () => {
+    const trimmed = newColorInput.trim();
+    if (!trimmed) return;
+    setIsSavingColor(true);
+    try {
+      const res = await fetch('/api/colors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        color?: { name: string };
+        error?: string;
+      };
+      const savedName = data.color?.name || trimmed;
+      setSheetColors((prev) => Array.from(new Set([savedName, ...prev])));
+      patchConfig({ colorName: savedName });
+      setNewColorInput('');
+      setIsAddingColor(false);
+      if (!res.ok || !data.success) {
+        setStatusIsError(true);
+        setStatusText(`เพิ่มสีในเครื่องแล้ว แต่ส่งเข้า Google Sheet ไม่สำเร็จ: ${data.error || `HTTP ${res.status}`}`);
+      } else {
+        setStatusIsError(false);
+        setStatusText(`เพิ่มสี "${savedName}" ลง Google Sheet (Colors) เรียบร้อยแล้ว`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setStatusIsError(true);
+      setStatusText(`บันทึกสีไม่สำเร็จ: ${msg}`);
+    } finally {
+      setIsSavingColor(false);
+    }
   };
 
   const handleSelectPaperPreset = (paperSizeId: string) => {
@@ -609,28 +663,57 @@ export const StickerStudio: React.FC<StickerStudioProps> = ({
                 </button>
               )}
             </div>
-            <input
-              type="text"
-              value={config.colorName}
-              onChange={(e) => patchConfig({ colorName: e.target.value })}
-              placeholder="พิมพ์ชื่อสี หรือเลือกปุ่มด้านล่าง"
-              className="w-full px-4 py-3 xl:py-4 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base sm:text-lg xl:text-xl font-semibold text-[#ffffff] placeholder:text-[#786656] focus:border-[#e8c170] focus:outline-none transition-colors"
-            />
-            <div className="flex flex-wrap gap-2 pt-1">
-              {QUICK_COLOR_CHIPS.map((c) => (
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={config.colorName}
+                onChange={(e) => patchConfig({ colorName: e.target.value })}
+                className="flex-1 min-w-[180px] px-4 py-3 xl:py-4 rounded-xl bg-[#120d0a] border border-[#523d2e] text-base sm:text-lg xl:text-xl font-semibold text-[#ffffff] focus:border-[#e8c170] focus:outline-none transition-colors"
+              >
+                <option value="">-- เว้นว่างไว้เขียนเอง --</option>
+                {(config.colorName && !sheetColors.includes(config.colorName)
+                  ? [config.colorName, ...sheetColors]
+                  : sheetColors
+                ).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              {!isAddingColor ? (
                 <button
-                  key={c}
                   type="button"
-                  onClick={() => patchConfig({ colorName: c })}
-                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border text-xs sm:text-sm xl:text-base font-semibold transition-all ${
-                    config.colorName === c
-                      ? 'bg-[#e8c170] text-[#1c1410] border-[#e8c170] font-bold shadow-md scale-105'
-                      : 'bg-[#120d0a] text-[#d6c8b6] border-[#3b2c21] hover:border-[#6a503b]'
-                  }`}
+                  onClick={() => setIsAddingColor(true)}
+                  className="px-4 py-3 xl:py-4 rounded-xl bg-[#291e16] hover:bg-[#38291e] border border-[#543e2d] text-sm sm:text-base font-bold text-[#e8c170] whitespace-nowrap transition-colors"
                 >
-                  {c}
+                  + เพิ่มชื่อสี
                 </button>
-              ))}
+              ) : (
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
+                  <input
+                    type="text"
+                    value={newColorInput}
+                    onChange={(e) => setNewColorInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleSaveNewColor();
+                      }
+                    }}
+                    placeholder="พิมพ์ชื่อสีใหม่..."
+                    autoFocus
+                    className="flex-1 min-w-[140px] px-3.5 py-2.5 xl:py-3.5 rounded-xl bg-[#120d0a] border border-[#e8c170] text-sm sm:text-base font-semibold text-[#ffffff] placeholder:text-[#786656] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSavingColor || !newColorInput.trim()}
+                    onClick={() => void handleSaveNewColor()}
+                    className="px-4 py-2.5 xl:py-3.5 rounded-xl bg-[#e8c170] hover:bg-[#ffd98c] disabled:opacity-50 text-[#1c1410] text-sm sm:text-base font-bold whitespace-nowrap transition-colors"
+                  >
+                    {isSavingColor ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
